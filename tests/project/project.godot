@@ -1,0 +1,6 @@
+; Godot test project for rivegd (docs/development-and-testing.md, Tier 3).
+config_version=5
+
+[application]
+
+config/name="rivegd tests"

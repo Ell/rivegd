@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Layering check
+        run: tools/check_layering.sh
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang ninja-build scons
+
+      - name: Cache rive stage-1 build
+        uses: actions/cache@v4
+        with:
+          path: thirdparty/rive-runtime/renderer/out
+          key: rive-linux-${{ hashFiles('.gitmodules', 'tools/build_rive.sh') }}-${{ hashFiles('thirdparty/rive-runtime/.git') }}
+
+      - name: Build rive (stage 1)
+        run: tools/build_rive.sh release
+
+      - name: Unit tests (Tier 0)
+        run: tools/test.sh all
+
+      - name: Build GDExtension (stage 2)
+        run: scons -j$(nproc)
+
+      - name: Godot headless smoke
+        run: |
+          curl -sfLO https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q Godot_v4.7-stable_linux.x86_64.zip
+          # --import aborts at exit for ANY class-registering GDExtension on
+          # Godot 4.7 headless — upstream bug, minimal repro in
+          # tests/upstream/godot-headless-import-crash/. Import completes
+          # before the crash, so best-effort is safe; the smoke run below is
+          # the real gate.
+          ./Godot_v4.7-stable_linux.x86_64 --headless --path tests/project --import || true
+          ./Godot_v4.7-stable_linux.x86_64 --headless --path tests/project --script smoke.gd

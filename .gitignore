@@ -1,0 +1,22 @@
+# build outputs
+out/
+addons/rive/bin/
+*.o
+*.os
+*.so
+*.dylib
+*.dll
+.sconsign*.dblite
+compile_commands.json
+
+# rive stage-1 build output (inside the submodule)
+thirdparty/rive-runtime/out/
+
+# python
+.venv/
+__pycache__/
+
+# godot project caches
+.godot/
+*.import
+.clangd
