@@ -43,12 +43,71 @@ PackedStringArray RiveFileResource::get_state_machine_names(
         const core::ArtboardMeta* meta =
             riv_file->find_artboard(p_artboard.utf8().get_data());
         if (meta != nullptr) {
-            for (const std::string& name : meta->state_machines) {
-                names.push_back(String::utf8(name.c_str()));
+            for (const core::StateMachineMeta& sm : meta->state_machines) {
+                names.push_back(String::utf8(sm.name.c_str()));
             }
         }
     }
     return names;
+}
+
+// Array of { name: String, type: "bool"|"number"|"trigger", default: Variant }.
+Array RiveFileResource::get_input_descriptions(
+    const String& p_artboard, const String& p_state_machine) const {
+    Array out;
+    if (riv_file == nullptr) {
+        return out;
+    }
+    const core::ArtboardMeta* artboard_meta =
+        riv_file->find_artboard(p_artboard.utf8().get_data());
+    if (artboard_meta == nullptr && !riv_file->artboards().empty() &&
+        p_artboard.is_empty()) {
+        artboard_meta = &riv_file->artboards()[0];
+    }
+    if (artboard_meta == nullptr) {
+        return out;
+    }
+    const core::StateMachineMeta* sm_meta =
+        artboard_meta->find_state_machine(p_state_machine.utf8().get_data());
+    if (sm_meta == nullptr && !artboard_meta->state_machines.empty() &&
+        p_state_machine.is_empty()) {
+        sm_meta = &artboard_meta->state_machines[0];
+    }
+    if (sm_meta == nullptr) {
+        return out;
+    }
+    for (const core::InputMeta& input : sm_meta->inputs) {
+        Dictionary description;
+        description["name"] = String::utf8(input.name.c_str());
+        switch (input.type) {
+            case core::InputMeta::Type::boolean:
+                description["type"] = "bool";
+                description["default"] = input.default_bool;
+                break;
+            case core::InputMeta::Type::number:
+                description["type"] = "number";
+                description["default"] = input.default_number;
+                break;
+            case core::InputMeta::Type::trigger:
+                description["type"] = "trigger";
+                break;
+        }
+        out.push_back(description);
+    }
+    return out;
+}
+
+Vector2 RiveFileResource::get_artboard_size(const String& p_artboard) const {
+    if (riv_file == nullptr) {
+        return Vector2();
+    }
+    const core::ArtboardMeta* meta =
+        riv_file->find_artboard(p_artboard.utf8().get_data());
+    if (meta == nullptr && !riv_file->artboards().empty() &&
+        p_artboard.is_empty()) {
+        meta = &riv_file->artboards()[0];
+    }
+    return meta != nullptr ? Vector2(meta->width, meta->height) : Vector2();
 }
 
 PackedStringArray RiveFileResource::get_animation_names(
@@ -79,6 +138,11 @@ void RiveFileResource::_bind_methods() {
                          &RiveFileResource::get_state_machine_names);
     ClassDB::bind_method(D_METHOD("get_animation_names", "artboard"),
                          &RiveFileResource::get_animation_names);
+    ClassDB::bind_method(
+        D_METHOD("get_input_descriptions", "artboard", "state_machine"),
+        &RiveFileResource::get_input_descriptions);
+    ClassDB::bind_method(D_METHOD("get_artboard_size", "artboard"),
+                         &RiveFileResource::get_artboard_size);
 
     ADD_PROPERTY(PropertyInfo(Variant::PACKED_BYTE_ARRAY, "data",
                               PROPERTY_HINT_NONE, "",

@@ -33,6 +33,10 @@ public:
         const godot::String& p_artboard) const;
     godot::PackedStringArray get_animation_names(
         const godot::String& p_artboard) const;
+    godot::Array get_input_descriptions(
+        const godot::String& p_artboard,
+        const godot::String& p_state_machine) const;
+    godot::Vector2 get_artboard_size(const godot::String& p_artboard) const;
 
 protected:
     static void _bind_methods();

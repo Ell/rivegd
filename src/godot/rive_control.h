@@ -2,13 +2,19 @@
 
 #include "godot/rive_instance.h"
 
-#include <godot_cpp/classes/node2d.hpp>
+#include <godot_cpp/classes/control.hpp>
+#include <godot_cpp/classes/input_event.hpp>
 
 namespace rivegd {
 
-// World-space 2D node that plays a Rive artboard (GOALS G4.1).
-class RiveSprite2D : public godot::Node2D {
-    GDCLASS(RiveSprite2D, godot::Node2D)
+// UI node that plays a Rive artboard inside a Control rect and forwards
+// pointer input to the state machine, so Rive listeners (hover/click/drag)
+// work with zero code (GOALS G4.1/G4.7).
+//
+// The render texture tracks the control's size; resizes are debounced so a
+// live drag doesn't re-import the file every frame.
+class RiveControl : public godot::Control {
+    GDCLASS(RiveControl, godot::Control)
 
 public:
     void set_file(const godot::Ref<RiveFileResource>& p_file);
@@ -20,9 +26,6 @@ public:
     void set_state_machine(const godot::String& p_state_machine);
     godot::String get_state_machine() const { return rive.state_machine; }
 
-    void set_size(const godot::Vector2i& p_size);
-    godot::Vector2i get_size() const { return size; }
-
     void set_playing(bool p_playing);
     bool is_playing() const { return playing; }
 
@@ -32,6 +35,9 @@ public:
     void set_bool_input(const godot::String& p_name, bool p_value);
     void set_number_input(const godot::String& p_name, double p_value);
     void fire_trigger(const godot::String& p_name);
+
+    godot::Vector2 _get_minimum_size() const override;
+    void _gui_input(const godot::Ref<godot::InputEvent>& p_event) override;
 
     void _notification(int p_what);
     bool _set(const godot::StringName& p_name, const godot::Variant& p_value);
@@ -44,11 +50,17 @@ protected:
 
 private:
     void recreate_instance();
+    godot::Vector2i texture_size() const;
 
     RiveInstance rive;
-    godot::Vector2i size = godot::Vector2i(512, 512);
     bool playing = true;
     double speed_scale = 1.0;
+
+    // Resize debounce: recreate the texture only after the size has been
+    // stable for this long.
+    static constexpr double kResizeDebounceSeconds = 0.3;
+    double resize_cooldown = 0.0;
+    godot::Vector2i live_texture_size;
 };
 
 } // namespace rivegd

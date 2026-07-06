@@ -1,5 +1,7 @@
 #include "core/riv_file.hpp"
 
+#include "rive/animation/state_machine_input_instance.hpp"
+#include "rive/animation/state_machine_instance.hpp"
 #include "rive/artboard.hpp"
 #include "utils/no_op_factory.hpp"
 
@@ -49,10 +51,44 @@ std::unique_ptr<RivFile> RivFile::import(const uint8_t* data,
         std::unique_ptr<rive::ArtboardInstance> instance =
             out->m_file->artboardAt(i);
         if (instance != nullptr) {
+            meta.width = instance->width();
+            meta.height = instance->height();
+
             const size_t sm_count = instance->stateMachineCount();
             meta.state_machines.reserve(sm_count);
             for (size_t j = 0; j < sm_count; ++j) {
-                meta.state_machines.push_back(instance->stateMachineNameAt(j));
+                StateMachineMeta sm_meta;
+                sm_meta.name = instance->stateMachineNameAt(j);
+
+                // Instance the machine (cheap, no-op factory) to enumerate
+                // inputs and their defaults through the public API.
+                std::unique_ptr<rive::StateMachineInstance> sm =
+                    instance->stateMachineAt(j);
+                if (sm != nullptr) {
+                    const size_t input_count = sm->inputCount();
+                    sm_meta.inputs.reserve(input_count);
+                    for (size_t k = 0; k < input_count; ++k) {
+                        const rive::SMIInput* input = sm->input(k);
+                        if (input == nullptr) {
+                            continue;
+                        }
+                        InputMeta input_meta;
+                        input_meta.name = input->name();
+                        if (const rive::SMIBool* b =
+                                sm->getBool(input_meta.name)) {
+                            input_meta.type = InputMeta::Type::boolean;
+                            input_meta.default_bool = b->value();
+                        } else if (const rive::SMINumber* n =
+                                       sm->getNumber(input_meta.name)) {
+                            input_meta.type = InputMeta::Type::number;
+                            input_meta.default_number = n->value();
+                        } else {
+                            input_meta.type = InputMeta::Type::trigger;
+                        }
+                        sm_meta.inputs.push_back(std::move(input_meta));
+                    }
+                }
+                meta.state_machines.push_back(std::move(sm_meta));
             }
             const size_t anim_count = instance->animationCount();
             meta.animations.reserve(anim_count);
@@ -66,6 +102,16 @@ std::unique_ptr<RivFile> RivFile::import(const uint8_t* data,
 }
 
 RivFile::~RivFile() = default;
+
+const StateMachineMeta* ArtboardMeta::find_state_machine(
+    const std::string& sm_name) const {
+    for (const StateMachineMeta& sm : state_machines) {
+        if (sm.name == sm_name) {
+            return &sm;
+        }
+    }
+    return nullptr;
+}
 
 const ArtboardMeta* RivFile::find_artboard(const std::string& name) const {
     for (const ArtboardMeta& meta : m_artboards) {

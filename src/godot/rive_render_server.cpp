@@ -3,7 +3,13 @@
 #include "render/vulkan/vulkan_bridge.hpp"
 
 #include "rive/artboard.hpp"
+#include "rive/animation/state_machine_input_instance.hpp"
 #include "rive/animation/state_machine_instance.hpp"
+#include "rive/custom_property_boolean.hpp"
+#include "rive/custom_property_number.hpp"
+#include "rive/custom_property_string.hpp"
+#include "rive/event.hpp"
+#include "rive/event_report.hpp"
 #include "rive/file.hpp"
 #include "rive/math/mat2d.hpp"
 #include "rive/renderer/rive_renderer.hpp"
@@ -68,6 +74,28 @@ RID RiveRenderServer::get_texture_rid(int64_t p_instance_id) {
     std::lock_guard<std::mutex> lock(mailbox_mutex);
     const RID* rid = texture_mailbox.getptr(p_instance_id);
     return rid != nullptr ? *rid : RID();
+}
+
+Array RiveRenderServer::take_events(int64_t p_instance_id) {
+    std::lock_guard<std::mutex> lock(mailbox_mutex);
+    Array* events = event_mailbox.getptr(p_instance_id);
+    if (events == nullptr || events->is_empty()) {
+        return Array();
+    }
+    Array out = *events;
+    *events = Array();
+    return out;
+}
+
+// Contain-fit transform shared by drawing and pointer mapping.
+struct ContainFit {
+    float scale, tx, ty;
+};
+static ContainFit contain_fit(float artboard_w, float artboard_h,
+                              float target_w, float target_h) {
+    const float scale = MIN(target_w / artboard_w, target_h / artboard_h);
+    return {scale, (target_w - artboard_w * scale) * 0.5f,
+            (target_h - artboard_h * scale) * 0.5f};
 }
 
 bool RiveRenderServer::rt_ensure_bridge() {
@@ -196,6 +224,45 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
 
     if (instance->state_machine != nullptr) {
         instance->state_machine->advanceAndApply(static_cast<float>(p_delta));
+
+        // Marshal reported events to the main-thread mailbox.
+        const size_t event_count = instance->state_machine->reportedEventCount();
+        if (event_count > 0) {
+            Array batch;
+            for (size_t i = 0; i < event_count; ++i) {
+                const rive::EventReport report =
+                    instance->state_machine->reportedEventAt(i);
+                rive::Event* event = report.event();
+                if (event == nullptr) {
+                    continue;
+                }
+                Dictionary entry;
+                entry["name"] = String::utf8(event->name().c_str());
+                entry["seconds_delay"] = report.secondsDelay();
+                Dictionary properties;
+                for (rive::Component* child : event->children()) {
+                    if (auto* b = child->as<rive::CustomPropertyBoolean>()) {
+                        properties[String::utf8(b->name().c_str())] =
+                            b->propertyValue();
+                    } else if (auto* n =
+                                   child->as<rive::CustomPropertyNumber>()) {
+                        properties[String::utf8(n->name().c_str())] =
+                            n->propertyValue();
+                    } else if (auto* s =
+                                   child->as<rive::CustomPropertyString>()) {
+                        properties[String::utf8(s->name().c_str())] =
+                            String::utf8(s->propertyValue().c_str());
+                    }
+                }
+                entry["properties"] = properties;
+                batch.push_back(entry);
+            }
+            if (!batch.is_empty()) {
+                std::lock_guard<std::mutex> lock(mailbox_mutex);
+                Array& events = event_mailbox[p_instance_id];
+                events.append_array(batch);
+            }
+        }
     } else {
         instance->artboard->advance(static_cast<float>(p_delta));
     }
@@ -204,15 +271,10 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
 
     rive::RiveRenderer renderer(bridge->render_context());
     renderer.save();
-    // Fit::contain, centered.
-    const float sx = float(instance->size.x) / instance->artboard->width();
-    const float sy = float(instance->size.y) / instance->artboard->height();
-    const float scale = MIN(sx, sy);
-    const float tx =
-        (float(instance->size.x) - instance->artboard->width() * scale) * 0.5f;
-    const float ty =
-        (float(instance->size.y) - instance->artboard->height() * scale) * 0.5f;
-    renderer.transform(rive::Mat2D(scale, 0, 0, scale, tx, ty));
+    const ContainFit fit =
+        contain_fit(instance->artboard->width(), instance->artboard->height(),
+                    float(instance->size.x), float(instance->size.y));
+    renderer.transform(rive::Mat2D(fit.scale, 0, 0, fit.scale, fit.tx, fit.ty));
     instance->artboard->draw(&renderer);
     renderer.restore();
 
@@ -220,6 +282,82 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
     if (!bridge->flush_to(instance->target.get(), &error)) {
         ERR_PRINT(String("rivegd: flush failed: ") + String::utf8(error.c_str()));
         instance->valid = false;
+    }
+}
+
+void RiveRenderServer::rt_set_bool(int64_t p_instance_id,
+                                   const String& p_name, bool p_value) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->state_machine == nullptr) {
+        return;
+    }
+    rive::SMIBool* input =
+        (*found)->state_machine->getBool(p_name.utf8().get_data());
+    if (input != nullptr) {
+        input->value(p_value);
+    }
+}
+
+void RiveRenderServer::rt_set_number(int64_t p_instance_id,
+                                     const String& p_name, double p_value) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->state_machine == nullptr) {
+        return;
+    }
+    rive::SMINumber* input =
+        (*found)->state_machine->getNumber(p_name.utf8().get_data());
+    if (input != nullptr) {
+        input->value(static_cast<float>(p_value));
+    }
+}
+
+void RiveRenderServer::rt_fire_trigger(int64_t p_instance_id,
+                                       const String& p_name) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->state_machine == nullptr) {
+        return;
+    }
+    rive::SMITrigger* input =
+        (*found)->state_machine->getTrigger(p_name.utf8().get_data());
+    if (input != nullptr) {
+        input->fire();
+    }
+}
+
+void RiveRenderServer::rt_pointer(int64_t p_instance_id, int p_phase,
+                                  const Vector2& p_local,
+                                  const Vector2& p_node_size) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->state_machine == nullptr) {
+        return;
+    }
+    Instance* instance = *found;
+
+    // Node-local pixels -> texture pixels -> artboard coordinates (inverse
+    // of the contain-fit draw transform).
+    const float texture_x =
+        p_local.x * (float(instance->size.x) / MAX(1.0f, p_node_size.x));
+    const float texture_y =
+        p_local.y * (float(instance->size.y) / MAX(1.0f, p_node_size.y));
+    const ContainFit fit =
+        contain_fit(instance->artboard->width(), instance->artboard->height(),
+                    float(instance->size.x), float(instance->size.y));
+    const rive::Vec2D position((texture_x - fit.tx) / fit.scale,
+                               (texture_y - fit.ty) / fit.scale);
+
+    switch (p_phase) {
+        case POINTER_MOVE:
+            instance->state_machine->pointerMove(position);
+            break;
+        case POINTER_DOWN:
+            instance->state_machine->pointerDown(position);
+            break;
+        case POINTER_UP:
+            instance->state_machine->pointerUp(position);
+            break;
+        case POINTER_EXIT:
+            instance->state_machine->pointerExit(position);
+            break;
     }
 }
 
@@ -233,6 +371,7 @@ void RiveRenderServer::rt_free_instance(int64_t p_instance_id) {
     {
         std::lock_guard<std::mutex> lock(mailbox_mutex);
         texture_mailbox.erase(p_instance_id);
+        event_mailbox.erase(p_instance_id);
     }
     if (bridge != nullptr) {
         // GPU may still be reading the target from the last flush.

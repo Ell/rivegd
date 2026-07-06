@@ -46,5 +46,25 @@ func _init() -> void:
 		return
 	print("garbage rejected with: ", bad.get_import_error())
 
+	# Loader path (headless-safe: metadata only, no GPU).
+	var loaded := load("res://fixtures/light_switch.riv")
+	if loaded == null or not (loaded is RiveFileResource):
+		push_error("SMOKE FAIL: ResourceFormatLoader did not load .riv")
+		quit(1)
+		return
+
+	# Dynamic inspector properties reflect state machine inputs.
+	var sprite: RiveSprite2D = RiveSprite2D.new()
+	sprite.file = loaded
+	var has_input_property := false
+	for property in sprite.get_property_list():
+		if property["name"] == "inputs/On":
+			has_input_property = true
+	sprite.free()
+	if not has_input_property:
+		push_error("SMOKE FAIL: inputs/On not in property list")
+		quit(1)
+		return
+
 	print("SMOKE OK")
 	quit(0)

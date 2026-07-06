@@ -70,6 +70,28 @@ TEST_CASE("bullet_man.riv has state machines") {
     REQUIRE(any_state_machine);
 }
 
+TEST_CASE("light_switch.riv exposes its 'On' bool input in metadata") {
+    auto bytes = read_file(FIXTURE("light_switch.riv"));
+    auto file = rivegd::core::RivFile::import(bytes.data(), bytes.size());
+    REQUIRE(file != nullptr);
+    REQUIRE(!file->artboards().empty());
+
+    const auto& artboard = file->artboards()[0];
+    REQUIRE(artboard.width > 0.0f);
+    REQUIRE(!artboard.state_machines.empty());
+
+    bool found_on = false;
+    for (const auto& sm : artboard.state_machines) {
+        for (const auto& input : sm.inputs) {
+            if (input.name == "On" &&
+                input.type == rivegd::core::InputMeta::Type::boolean) {
+                found_on = true;
+            }
+        }
+    }
+    REQUIRE(found_on);
+}
+
 TEST_CASE("headless advance: instance a state machine and run it") {
     auto bytes = read_file(FIXTURE("bullet_man.riv"));
     auto file = rivegd::core::RivFile::import(bytes.data(), bytes.size());

@@ -13,10 +13,27 @@
 
 namespace rivegd::core {
 
+struct InputMeta {
+    enum class Type { boolean, number, trigger };
+    std::string name;
+    Type type = Type::trigger;
+    bool default_bool = false;
+    float default_number = 0.0f;
+};
+
+struct StateMachineMeta {
+    std::string name;
+    std::vector<InputMeta> inputs;
+};
+
 struct ArtboardMeta {
     std::string name;
-    std::vector<std::string> state_machines;
+    float width = 0.0f;
+    float height = 0.0f;
+    std::vector<StateMachineMeta> state_machines;
     std::vector<std::string> animations;
+
+    const StateMachineMeta* find_state_machine(const std::string& sm_name) const;
 };
 
 // An imported .riv file plus enumerated metadata.

@@ -43,6 +43,12 @@ public:
     // Main thread: RID mailbox (filled by rt_init_instance).
     godot::RID get_texture_rid(int64_t p_instance_id);
 
+    // Main thread: drain events reported since the last call (Array of
+    // Dictionaries: { name, seconds_delay, properties }).
+    godot::Array take_events(int64_t p_instance_id);
+
+    enum PointerPhase { POINTER_MOVE = 0, POINTER_DOWN, POINTER_UP, POINTER_EXIT };
+
     // Render thread only.
     void rt_init_instance(int64_t p_instance_id,
                           const godot::PackedByteArray& p_data,
@@ -51,6 +57,16 @@ public:
                           const godot::Vector2i& p_size);
     void rt_frame(int64_t p_instance_id, double p_delta);
     void rt_free_instance(int64_t p_instance_id);
+    void rt_set_bool(int64_t p_instance_id, const godot::String& p_name,
+                     bool p_value);
+    void rt_set_number(int64_t p_instance_id, const godot::String& p_name,
+                       double p_value);
+    void rt_fire_trigger(int64_t p_instance_id, const godot::String& p_name);
+    // p_local is in node-local pixels; p_node_size the node's drawn size —
+    // mapped through the same contain-fit transform used for drawing.
+    void rt_pointer(int64_t p_instance_id, int p_phase,
+                    const godot::Vector2& p_local,
+                    const godot::Vector2& p_node_size);
 
 protected:
     static void _bind_methods();
@@ -68,6 +84,7 @@ private:
 
     std::mutex mailbox_mutex;
     godot::HashMap<int64_t, godot::RID> texture_mailbox;
+    godot::HashMap<int64_t, godot::Array> event_mailbox;
 
     std::atomic<int64_t> next_instance_id{1};
 };

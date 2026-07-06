@@ -1,29 +1,41 @@
 #include "godot/register_types.h"
 
+#include "godot/rive_control.h"
+#include "godot/rive_file_loader.h"
 #include "godot/rive_file_resource.h"
 #include "godot/rive_render_server.h"
 #include "godot/rive_sprite_2d.h"
 
 #include <gdextension_interface.h>
+#include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
 
 using namespace godot;
+
+static Ref<rivegd::RiveFileLoader> riv_loader;
 
 void initialize_rivegd_module(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
         return;
     }
     GDREGISTER_CLASS(rivegd::RiveFileResource);
+    GDREGISTER_CLASS(rivegd::RiveFileLoader);
     GDREGISTER_INTERNAL_CLASS(rivegd::RiveRenderServer);
     GDREGISTER_CLASS(rivegd::RiveSprite2D);
+    GDREGISTER_CLASS(rivegd::RiveControl);
     rivegd::RiveRenderServer::create_singleton();
+
+    riv_loader.instantiate();
+    ResourceLoader::get_singleton()->add_resource_format_loader(riv_loader);
 }
 
 void uninitialize_rivegd_module(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
         return;
     }
+    ResourceLoader::get_singleton()->remove_resource_format_loader(riv_loader);
+    riv_loader.unref();
     rivegd::RiveRenderServer::free_singleton();
 }
 
