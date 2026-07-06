@@ -25,5 +25,7 @@ CONFIG="${1:-release}"
 # references when built with the default --with_rive_text --with_rive_layout.
 cd "$ROOT/thirdparty/rive-runtime/renderer"
 # --with-pic: the archives get linked into a shared library (GDExtension).
-exec ../build/build_rive.sh ninja "$CONFIG" --no-lto --with-pic -- \
-    rive rive_harfbuzz rive_sheenbidi rive_yoga
+# --with_vulkan: enables the Vulkan RenderContext backend (Phase 1).
+exec ../build/build_rive.sh ninja "$CONFIG" --no-lto --with-pic --with_vulkan -- \
+    rive rive_pls_renderer rive_decoders rive_harfbuzz rive_sheenbidi \
+    rive_yoga libpng libjpeg libwebp zlib

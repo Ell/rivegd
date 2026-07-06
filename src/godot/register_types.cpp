@@ -1,6 +1,8 @@
 #include "godot/register_types.h"
 
 #include "godot/rive_file_resource.h"
+#include "godot/rive_render_server.h"
+#include "godot/rive_sprite_2d.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/defs.hpp>
@@ -13,12 +15,16 @@ void initialize_rivegd_module(ModuleInitializationLevel p_level) {
         return;
     }
     GDREGISTER_CLASS(rivegd::RiveFileResource);
+    GDREGISTER_INTERNAL_CLASS(rivegd::RiveRenderServer);
+    GDREGISTER_CLASS(rivegd::RiveSprite2D);
+    rivegd::RiveRenderServer::create_singleton();
 }
 
 void uninitialize_rivegd_module(ModuleInitializationLevel p_level) {
     if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
         return;
     }
+    rivegd::RiveRenderServer::free_singleton();
 }
 
 extern "C" {
