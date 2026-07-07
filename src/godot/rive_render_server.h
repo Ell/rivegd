@@ -47,6 +47,9 @@ public:
     // Dictionaries: { name, seconds_delay, properties }).
     godot::Array take_events(int64_t p_instance_id);
 
+    // Main thread: drain state-change notifications (Array of state names).
+    godot::Array take_state_changes(int64_t p_instance_id);
+
     enum PointerPhase { POINTER_MOVE = 0, POINTER_DOWN, POINTER_UP, POINTER_EXIT };
 
     // Render thread only.
@@ -68,6 +71,18 @@ public:
                     const godot::Vector2& p_local,
                     const godot::Vector2& p_node_size);
 
+    // Data binding (view model) writes; p_path is Rive's slash-delimited
+    // property path (e.g. "stats/health").
+    void rt_set_vm_bool(int64_t p_instance_id, const godot::String& p_path,
+                        bool p_value);
+    void rt_set_vm_number(int64_t p_instance_id, const godot::String& p_path,
+                          double p_value);
+    void rt_set_vm_string(int64_t p_instance_id, const godot::String& p_path,
+                          const godot::String& p_value);
+    void rt_set_vm_color(int64_t p_instance_id, const godot::String& p_path,
+                         const godot::Color& p_value);
+    void rt_fire_vm_trigger(int64_t p_instance_id, const godot::String& p_path);
+
 protected:
     static void _bind_methods();
 
@@ -85,6 +100,7 @@ private:
     std::mutex mailbox_mutex;
     godot::HashMap<int64_t, godot::RID> texture_mailbox;
     godot::HashMap<int64_t, godot::Array> event_mailbox;
+    godot::HashMap<int64_t, godot::Array> state_mailbox;
 
     std::atomic<int64_t> next_instance_id{1};
 };

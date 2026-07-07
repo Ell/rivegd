@@ -33,6 +33,10 @@ void RiveControl::_bind_methods() {
                          &RiveControl::set_number_input);
     ClassDB::bind_method(D_METHOD("fire_trigger", "name"),
                          &RiveControl::fire_trigger);
+    ClassDB::bind_method(D_METHOD("set_property", "path", "value"),
+                         &RiveControl::set_property);
+    ClassDB::bind_method(D_METHOD("fire_property_trigger", "path"),
+                         &RiveControl::fire_property_trigger);
 
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "file",
                               PROPERTY_HINT_RESOURCE_TYPE, "RiveFileResource"),
@@ -50,10 +54,20 @@ void RiveControl::_bind_methods() {
     ADD_SIGNAL(MethodInfo("rive_event",
                           PropertyInfo(Variant::STRING, "name"),
                           PropertyInfo(Variant::DICTIONARY, "properties")));
+    ADD_SIGNAL(MethodInfo("state_changed",
+                          PropertyInfo(Variant::STRING, "state_name")));
 }
 
 void RiveControl::set_file(const Ref<RiveFileResource>& p_file) {
+    // Hot reload: re-imports emit changed on the resource.
+    Callable reload = callable_mp(this, &RiveControl::recreate_instance);
+    if (rive.file.is_valid() && rive.file->is_connected("changed", reload)) {
+        rive.file->disconnect("changed", reload);
+    }
     rive.file = p_file;
+    if (rive.file.is_valid()) {
+        rive.file->connect("changed", reload);
+    }
     recreate_instance();
     update_minimum_size();
     notify_property_list_changed();
@@ -91,6 +105,14 @@ void RiveControl::set_number_input(const String& p_name, double p_value) {
 
 void RiveControl::fire_trigger(const String& p_name) {
     rive.fire_trigger(p_name);
+}
+
+void RiveControl::set_property(const String& p_path, const Variant& p_value) {
+    rive.set_property(p_path, p_value);
+}
+
+void RiveControl::fire_property_trigger(const String& p_path) {
+    rive.fire_property_trigger(p_path);
 }
 
 Vector2 RiveControl::_get_minimum_size() const {
@@ -169,6 +191,10 @@ void RiveControl::_notification(int p_what) {
             for (int i = 0; i < events.size(); ++i) {
                 Dictionary event = events[i];
                 emit_signal("rive_event", event["name"], event["properties"]);
+            }
+            Array states = rive.take_state_changes();
+            for (int i = 0; i < states.size(); ++i) {
+                emit_signal("state_changed", states[i]);
             }
         } break;
         case NOTIFICATION_DRAW: {

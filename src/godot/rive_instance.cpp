@@ -27,9 +27,13 @@ void RiveInstance::create(const Vector2i& p_size) {
         callable_mp(server, &RiveRenderServer::rt_init_instance)
             .bind(instance_id, file->get_data(), artboard, state_machine,
                   p_size));
-    // Replay inspector/script-set inputs onto the fresh instance.
+    // Replay inspector/script-set inputs and view-model properties onto the
+    // fresh instance.
     for (const KeyValue<String, Variant>& entry : input_values) {
         post_input(entry.key, entry.value);
+    }
+    for (const KeyValue<String, Variant>& entry : property_values) {
+        post_property(entry.key, entry.value);
     }
     texture_bound = false;
 }
@@ -80,6 +84,64 @@ Array RiveInstance::take_events() {
         return Array();
     }
     return RiveRenderServer::get_singleton()->take_events(instance_id);
+}
+
+Array RiveInstance::take_state_changes() {
+    if (instance_id == 0) {
+        return Array();
+    }
+    return RiveRenderServer::get_singleton()->take_state_changes(instance_id);
+}
+
+void RiveInstance::post_property(const String& p_path, const Variant& p_value) {
+    RiveRenderServer* server = RiveRenderServer::get_singleton();
+    if (server == nullptr || instance_id == 0) {
+        return;
+    }
+    RenderingServer* rs = RenderingServer::get_singleton();
+    switch (p_value.get_type()) {
+        case Variant::BOOL:
+            rs->call_on_render_thread(
+                callable_mp(server, &RiveRenderServer::rt_set_vm_bool)
+                    .bind(instance_id, p_path, bool(p_value)));
+            break;
+        case Variant::INT:
+        case Variant::FLOAT:
+            rs->call_on_render_thread(
+                callable_mp(server, &RiveRenderServer::rt_set_vm_number)
+                    .bind(instance_id, p_path, double(p_value)));
+            break;
+        case Variant::STRING:
+        case Variant::STRING_NAME:
+            rs->call_on_render_thread(
+                callable_mp(server, &RiveRenderServer::rt_set_vm_string)
+                    .bind(instance_id, p_path, String(p_value)));
+            break;
+        case Variant::COLOR:
+            rs->call_on_render_thread(
+                callable_mp(server, &RiveRenderServer::rt_set_vm_color)
+                    .bind(instance_id, p_path, Color(p_value)));
+            break;
+        default:
+            ERR_PRINT("rivegd: unsupported view-model property type for '" +
+                      p_path + "'");
+            break;
+    }
+}
+
+void RiveInstance::set_property(const String& p_path, const Variant& p_value) {
+    property_values[p_path] = p_value;
+    post_property(p_path, p_value);
+}
+
+void RiveInstance::fire_property_trigger(const String& p_path) {
+    RiveRenderServer* server = RiveRenderServer::get_singleton();
+    if (server == nullptr || instance_id == 0) {
+        return;
+    }
+    RenderingServer::get_singleton()->call_on_render_thread(
+        callable_mp(server, &RiveRenderServer::rt_fire_vm_trigger)
+            .bind(instance_id, p_path));
 }
 
 void RiveInstance::post_input(const String& p_name, const Variant& p_value) {

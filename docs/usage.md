@@ -65,16 +65,43 @@ $Menu.fire_trigger("open")
 create_tween().tween_property($Menu, "inputs/health", 1.0, 0.5)
 ```
 
-### Events
+### Data binding (view models)
 
-Rive events reported by the state machine surface as a signal, with custom
-properties as a Dictionary:
+If the artboard has a default view model, it is bound automatically.
+Properties are path-addressed and typed by the Variant you pass
+(bool / number / String / Color):
+
+```gdscript
+$HUD.set_property("stats/health", 0.75)
+$HUD.set_property("user/name", "ell")
+$HUD.set_property("theme/accent", Color.CRIMSON)
+$HUD.fire_property_trigger("stats/level_up")
+```
+
+Values set from script or the inspector are cached and re-applied when the
+instance rebuilds (file swap, resize, hot reload). Reading values back and
+per-path change signals are on the roadmap (GOALS G4.4).
+
+### Events & state changes
+
+Rive events surface as a signal with custom properties as a Dictionary;
+state-machine transitions report the entered animation state's name:
 
 ```gdscript
 $Menu.rive_event.connect(func(event_name: String, properties: Dictionary):
     if event_name == "purchase":
         buy(properties.get("sku", "")))
+
+$Menu.state_changed.connect(func(state_name: String):
+    print("entered state: ", state_name))
 ```
+
+### Hot reload
+
+Nodes rebuild automatically whenever their `RiveFileResource` changes —
+re-exporting a `.riv` over the same file (or calling `set_data`) updates
+every live instance; inspector-set inputs and view-model properties are
+re-applied by name.
 
 ### Time
 

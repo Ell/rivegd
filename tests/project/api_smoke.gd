@@ -94,5 +94,50 @@ func _process(_delta: float) -> void:
 			fail("pixels did not change after simulated click (listener)")
 			return
 		print("events seen: ", events_seen)
+		_start_databind_phase()
+	elif frames == 160:
+		image_a = _screenshot()
+		_save(image_a, "api_smoke_databind_before.png")
+		# Click at artboard (75,75): a nested-artboard listener updates a
+		# view model value that doubles a rectangle's width (mirrors rive's
+		# data_binding_cycle_test).
+		var ab: Vector2 = control.file.get_artboard_size("main-1")
+		var s: float = min(control.size.x / ab.x, control.size.y / ab.y)
+		var offset: Vector2 = (control.size - ab * s) / 2.0
+		var target: Vector2 = control.global_position \
+				+ Vector2(75, 75) * s + offset
+		var down := InputEventMouseButton.new()
+		down.button_index = MOUSE_BUTTON_LEFT
+		down.pressed = true
+		down.position = target
+		down.global_position = target
+		get_viewport().push_input(down)
+		var up := down.duplicate()
+		up.pressed = false
+		get_viewport().push_input(up)
+		# Also exercise the direct write path (unknown paths must be safe).
+		control.set_property("nonexistent/path", 1.0)
+	elif frames == 200:
+		var image_b := _screenshot()
+		_save(image_b, "api_smoke_databind_after.png")
+		if image_a.get_data() == image_b.get_data():
+			fail("pixels did not change after data-binding click")
+			return
+		# Hot reload: re-setting the data must rebuild the instance cleanly.
+		control.file.set_data(control.file.get_data())
+	elif frames == 240:
+		if not control.file.is_valid():
+			fail("file invalid after hot reload")
+			return
 		print("API SMOKE OK")
 		get_tree().quit(0)
+
+
+func _start_databind_phase() -> void:
+	control.queue_free()
+	control = RiveControl.new()
+	control.file = load("res://fixtures/data_binding_test_3.riv")
+	control.artboard = "main-1"
+	control.position = Vector2(32, 32)
+	control.size = Vector2(400, 400)
+	add_child(control)

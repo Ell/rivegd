@@ -3,8 +3,17 @@
 #include "render/vulkan/vulkan_bridge.hpp"
 
 #include "rive/artboard.hpp"
+#include "rive/animation/animation_state.hpp"
+#include "rive/animation/linear_animation.hpp"
 #include "rive/animation/state_machine_input_instance.hpp"
 #include "rive/animation/state_machine_instance.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_boolean_runtime.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_color_runtime.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_number_runtime.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_runtime.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_string_runtime.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_trigger_runtime.hpp"
+#include "rive/viewmodel/viewmodel_instance.hpp"
 #include "rive/custom_property_boolean.hpp"
 #include "rive/custom_property_number.hpp"
 #include "rive/custom_property_string.hpp"
@@ -31,6 +40,7 @@ struct RiveRenderServer::Instance {
     rive::rcp<rive::File> file;
     std::unique_ptr<rive::ArtboardInstance> artboard;
     std::unique_ptr<rive::StateMachineInstance> state_machine;
+    rive::rcp<rive::ViewModelInstanceRuntime> view_model;
     rive::rcp<rive::gpu::RenderTargetVulkanImpl> target;
     RID rd_texture;
     Vector2i size;
@@ -84,6 +94,17 @@ Array RiveRenderServer::take_events(int64_t p_instance_id) {
     }
     Array out = *events;
     *events = Array();
+    return out;
+}
+
+Array RiveRenderServer::take_state_changes(int64_t p_instance_id) {
+    std::lock_guard<std::mutex> lock(mailbox_mutex);
+    Array* states = state_mailbox.getptr(p_instance_id);
+    if (states == nullptr || states->is_empty()) {
+        return Array();
+    }
+    Array out = *states;
+    *states = Array();
     return out;
 }
 
@@ -176,6 +197,20 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
         instance->state_machine = instance->artboard->stateMachineAt(0);
     }
 
+    // Data binding: bind the file's default view model instance when the
+    // artboard declares one (no-op otherwise).
+    rive::rcp<rive::ViewModelInstance> vmi =
+        instance->file->createDefaultViewModelInstance(instance->artboard.get());
+    if (vmi != nullptr) {
+        if (instance->state_machine != nullptr) {
+            instance->state_machine->bindViewModelInstance(vmi);
+        } else {
+            instance->artboard->bindViewModelInstance(vmi);
+        }
+        instance->view_model = rive::rcp<rive::ViewModelInstanceRuntime>(
+            new rive::ViewModelInstanceRuntime(vmi));
+    }
+
     // Create the shared texture through Godot's RD so the scene side can
     // sample it via Texture2DRD; hand its VkImage to Rive as render target.
     RenderingDevice* rd = RenderingServer::get_singleton()->get_rendering_device();
@@ -261,6 +296,30 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
                 std::lock_guard<std::mutex> lock(mailbox_mutex);
                 Array& events = event_mailbox[p_instance_id];
                 events.append_array(batch);
+            }
+        }
+
+        // State transitions -> state_changed signal (animation states carry
+        // the meaningful names; entry/exit/any states are skipped).
+        const size_t state_count = instance->state_machine->stateChangedCount();
+        if (state_count > 0) {
+            Array names;
+            for (size_t i = 0; i < state_count; ++i) {
+                const rive::LayerState* state =
+                    instance->state_machine->stateChangedByIndex(i);
+                if (state != nullptr && state->is<rive::AnimationState>()) {
+                    const auto* animation_state =
+                        state->as<rive::AnimationState>();
+                    if (animation_state->animation() != nullptr) {
+                        names.push_back(String::utf8(
+                            animation_state->animation()->name().c_str()));
+                    }
+                }
+            }
+            if (!names.is_empty()) {
+                std::lock_guard<std::mutex> lock(mailbox_mutex);
+                Array& states = state_mailbox[p_instance_id];
+                states.append_array(names);
             }
         }
     } else {
@@ -361,6 +420,74 @@ void RiveRenderServer::rt_pointer(int64_t p_instance_id, int p_phase,
     }
 }
 
+void RiveRenderServer::rt_set_vm_bool(int64_t p_instance_id,
+                                      const String& p_path, bool p_value) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->view_model == nullptr) {
+        return;
+    }
+    auto* property =
+        (*found)->view_model->propertyBoolean(p_path.utf8().get_data());
+    if (property != nullptr) {
+        property->value(p_value);
+    }
+}
+
+void RiveRenderServer::rt_set_vm_number(int64_t p_instance_id,
+                                        const String& p_path, double p_value) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->view_model == nullptr) {
+        return;
+    }
+    auto* property =
+        (*found)->view_model->propertyNumber(p_path.utf8().get_data());
+    if (property != nullptr) {
+        property->value(static_cast<float>(p_value));
+    }
+}
+
+void RiveRenderServer::rt_set_vm_string(int64_t p_instance_id,
+                                        const String& p_path,
+                                        const String& p_value) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->view_model == nullptr) {
+        return;
+    }
+    auto* property =
+        (*found)->view_model->propertyString(p_path.utf8().get_data());
+    if (property != nullptr) {
+        property->value(p_value.utf8().get_data());
+    }
+}
+
+void RiveRenderServer::rt_set_vm_color(int64_t p_instance_id,
+                                       const String& p_path,
+                                       const Color& p_value) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->view_model == nullptr) {
+        return;
+    }
+    auto* property =
+        (*found)->view_model->propertyColor(p_path.utf8().get_data());
+    if (property != nullptr) {
+        property->argb(int(p_value.a * 255.0f), int(p_value.r * 255.0f),
+                       int(p_value.g * 255.0f), int(p_value.b * 255.0f));
+    }
+}
+
+void RiveRenderServer::rt_fire_vm_trigger(int64_t p_instance_id,
+                                          const String& p_path) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->view_model == nullptr) {
+        return;
+    }
+    auto* property =
+        (*found)->view_model->propertyTrigger(p_path.utf8().get_data());
+    if (property != nullptr) {
+        property->trigger();
+    }
+}
+
 void RiveRenderServer::rt_free_instance(int64_t p_instance_id) {
     Instance** found = instances.getptr(p_instance_id);
     if (found == nullptr) {
@@ -372,6 +499,7 @@ void RiveRenderServer::rt_free_instance(int64_t p_instance_id) {
         std::lock_guard<std::mutex> lock(mailbox_mutex);
         texture_mailbox.erase(p_instance_id);
         event_mailbox.erase(p_instance_id);
+        state_mailbox.erase(p_instance_id);
     }
     if (bridge != nullptr) {
         // GPU may still be reading the target from the last flush.

@@ -36,6 +36,9 @@ public:
     void set_number_input(const godot::String& p_name, double p_value);
     void fire_trigger(const godot::String& p_name);
 
+    void set_property(const godot::String& p_path, const godot::Variant& p_value);
+    void fire_property_trigger(const godot::String& p_path);
+
     godot::Vector2 _get_minimum_size() const override;
     void _gui_input(const godot::Ref<godot::InputEvent>& p_event) override;
 

@@ -33,10 +33,16 @@ public:
     godot::Ref<godot::Texture2DRD> get_texture() const { return texture; }
 
     godot::Array take_events();
+    godot::Array take_state_changes();
 
     void set_bool_input(const godot::String& p_name, bool p_value);
     void set_number_input(const godot::String& p_name, double p_value);
     void fire_trigger(const godot::String& p_name);
+
+    // Data binding: path-addressed view model property writes
+    // (bool/int/float/String/Color dispatched by Variant type).
+    void set_property(const godot::String& p_path, const godot::Variant& p_value);
+    void fire_property_trigger(const godot::String& p_path);
     void pointer(int p_phase, const godot::Vector2& p_local,
                  const godot::Vector2& p_node_size);
 
@@ -52,8 +58,12 @@ private:
     int64_t instance_id = 0;
     godot::Ref<godot::Texture2DRD> texture;
     bool texture_bound = false;
-    // Inspector-set input values, replayed whenever the instance recreates.
+    void post_property(const godot::String& p_path,
+                       const godot::Variant& p_value);
+
+    // Inspector/script-set values, replayed whenever the instance recreates.
     godot::HashMap<godot::String, godot::Variant> input_values;
+    godot::HashMap<godot::String, godot::Variant> property_values;
 };
 
 } // namespace rivegd
