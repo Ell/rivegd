@@ -43,7 +43,7 @@ runtime + Rive Renderer.
 | Feature | rive-unity | rivegd status |
 |---|---|---|
 | **Shipped platforms** | D3D11, Metal (macOS/iOS), OpenGL (Win/Android), Vulkan (Win/Android/Linux), WebGL | Linux Vulkan today; GL bridge written (Android/WebGL2 targets); Metal/D3D12/web pending hardware/phase 4. **Biggest gap.** |
-| **Out-of-band assets** (share images/fonts across .rivs, referenced assets) | ✅ shipped | planned (G3.6 FileAssetLoader bridge) |
+| Out-of-band assets (referenced images/fonts/audio) | ✅ shipped | ✅ shipped (sibling-file convention, queue global registry; smoke-verified) |
 | **Listener-aware hit testing** (`Translucent`: blocks pointer only where an interactive listener is) | ✅ per-widget Hit Test Behavior | rect-only (STOP/IGNORE); needs a sync hit query our render-thread model doesn't expose yet |
 | **Multitouch** | ✅ | single pointer (Godot touch→mouse) |
 | **Panel compositor** (many widgets → ONE render texture) | ✅ RivePanel | one texture per instance (GPU work batched, but N textures) |
@@ -66,7 +66,7 @@ C++ runtime and need no integration surface — we inherit the C++ column's
 - At parity or better: 17/20 rows (data binding incl. lists/images/
   artboards, text, layouts, feathering, audio, scripting, events,
   listeners, raster assets, caching-of-resources…).
-- **Real gap: Out-of-Band Assets** (Unity ✅ / us ❌) — task #14.
+- Out-of-Band Assets: ✅ closed (was the one real gap; sibling-file convention + queue global registry, smoke-verified).
 - **Partial: Caching Rive Files** — Godot caches the resource; each
   instance still re-imports (loadFile per create). Task #23.
 - Parity-at-❌ (neither has it): Fallback Fonts (task #24), Semantics —

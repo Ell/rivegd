@@ -160,6 +160,27 @@ TEST_CASE("rivegd_fixtures.riv (editor-authored) enumerates as designed") {
     REQUIRE((scale && color && label && pulse));
 }
 
+TEST_CASE("out-of-band assets enumerate as unresolved (G3.6)") {
+    auto bytes = read_file(OUR_FIXTURE("oob/walle.riv"));
+    auto file = rivegd::core::RivFile::import(bytes.data(), bytes.size());
+    REQUIRE(file != nullptr);
+    // walle.riv references walle-370.png and eve-317.png out of band; a
+    // NoOpFactory import must list them, typed and unresolved.
+    bool walle = false, eve = false;
+    for (const auto& asset : file->assets()) {
+        if (asset.unique_filename == "walle-370.png") {
+            walle = true;
+            REQUIRE(asset.type == "image");
+            REQUIRE(!asset.resolved);
+        }
+        if (asset.unique_filename == "eve-317.png") {
+            eve = true;
+        }
+    }
+    REQUIRE(walle);
+    REQUIRE(eve);
+}
+
 TEST_CASE("headless advance: instance a state machine and run it") {
     auto bytes = read_file(FIXTURE("bullet_man.riv"));
     auto file = rivegd::core::RivFile::import(bytes.data(), bytes.size());

@@ -198,6 +198,21 @@ re-exporting a `.riv` over the same file (or calling `set_data`) updates
 every live instance; inspector-set inputs and view-model properties are
 re-applied by name.
 
+### Out-of-band (referenced) assets
+
+Rive files can *reference* images/fonts/audio instead of embedding them
+("out-of-band" exports). rivegd resolves these automatically: place the
+asset files next to the `.riv` using Rive's export naming
+(`<name>-<id>.png` etc. — exactly what the editor's export produces) and
+they decode and render with no code. Inspect what a file references:
+
+```gdscript
+for a in rive_file.get_asset_descriptions():
+    print(a["unique_filename"], " type=", a["type"], " resolved=", a["resolved"])
+```
+
+`resolved=false` after load means the sibling file was missing.
+
 ### Overlays over a game (HUDs, health bars, dialogue)
 
 Rive shines as UI *over* gameplay. The patterns:

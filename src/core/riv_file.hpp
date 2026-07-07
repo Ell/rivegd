@@ -27,6 +27,15 @@ struct VmPropertyMeta {
     std::vector<std::string> enum_values; // filled for type == "enum"
 };
 
+// One asset the file references (embedded or out-of-band). GOALS G3.6.
+struct AssetMeta {
+    std::string name;            // authored asset name
+    std::string unique_name;     // rive's registry key ("name-id")
+    std::string unique_filename; // rive's export convention ("name-id.ext")
+    std::string type;            // "image" | "font" | "audio" | "other"
+    bool resolved = false;       // false = out-of-band and not yet provided
+};
+
 struct StateMachineMeta {
     std::string name;
     std::vector<InputMeta> inputs;
@@ -58,6 +67,7 @@ public:
 
     const std::vector<ArtboardMeta>& artboards() const { return m_artboards; }
     const ArtboardMeta* find_artboard(const std::string& name) const;
+    const std::vector<AssetMeta>& assets() const { return m_assets; }
 
     rive::File* raw() const { return m_file.get(); }
 
@@ -66,6 +76,7 @@ private:
 
     rive::rcp<rive::File> m_file;
     std::vector<ArtboardMeta> m_artboards;
+    std::vector<AssetMeta> m_assets;
 };
 
 } // namespace rivegd::core

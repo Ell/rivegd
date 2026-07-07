@@ -3,6 +3,7 @@
 #include "godot/rive_file_resource.h"
 
 #include <godot_cpp/templates/hash_map.hpp>
+#include <godot_cpp/templates/local_vector.hpp>
 #include <godot_cpp/variant/variant.hpp>
 
 namespace rivegd {
@@ -93,6 +94,13 @@ private:
 
     int64_t instance_id = 0;
     uint64_t file_handle = 0;
+    // Out-of-band asset handles registered for this instance's file
+    // (deleted on release; deletion auto-clears the global registry).
+    struct OobHandle {
+        int type = 0; // 0 image, 1 font, 2 audio
+        uint64_t handle = 0;
+    };
+    godot::LocalVector<OobHandle> oob_handles;
     uint64_t artboard_handle = 0;
     uint64_t state_machine_handle = 0;
     godot::RID canvas_texture;

@@ -28,7 +28,7 @@ Design rationale and evidence live in [`docs/implementation-strategy.md`](docs/i
 - **G3.3** Hot reload: re-export from the Rive editor updates a running editor preview (and a `--debug` game) in place, preserving matching input values.
 - **G3.4** Drag-and-drop instantiation: `.riv` → viewport creates a configured node.
 - **G3.5** Node configuration warnings for stale references (missing artboard, deleted input, scripts present but scripting disabled).
-- **G3.6** Out-of-band assets (images, fonts) resolve through Godot's resource system via a `FileAssetLoader` bridge.
+- **G3.6** Out-of-band assets (images, fonts, audio) resolve automatically: referenced assets are found by rive's export convention (`<name>-<id>.<ext>` next to the `.riv`), decoded through the CommandQueue, and registered in its global asset registry before import. ✅ (verified: walle.riv's referenced PNGs render; `get_asset_descriptions()` exposes the manifest)
 
 ## G4. Runtime API: a native Godot citizen
 

@@ -29,6 +29,9 @@ public:
     godot::String get_import_error() const { return import_error; }
 
     godot::PackedStringArray get_artboard_names() const;
+    // Assets the file references: [{name, unique_name, unique_filename,
+    // type, resolved}] — unresolved entries are out-of-band (GOALS G3.6).
+    godot::Array get_asset_descriptions() const;
     godot::PackedStringArray get_state_machine_names(
         const godot::String& p_artboard) const;
     godot::PackedStringArray get_animation_names(

@@ -3,6 +3,10 @@
 #include "rive/animation/state_machine_input_instance.hpp"
 #include "rive/animation/state_machine_instance.hpp"
 #include "rive/artboard.hpp"
+#include "rive/assets/audio_asset.hpp"
+#include "rive/assets/file_asset.hpp"
+#include "rive/assets/font_asset.hpp"
+#include "rive/assets/image_asset.hpp"
 #include "rive/data_bind/data_values/data_type.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_enum_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_runtime.hpp"
@@ -143,6 +147,29 @@ std::unique_ptr<RivFile> RivFile::import(const uint8_t* data,
         }
         out->m_artboards.push_back(std::move(meta));
     }
+    for (const rive::rcp<rive::FileAsset>& asset : out->m_file->assets()) {
+        AssetMeta meta;
+        meta.name = asset->name();
+        meta.unique_name = asset->uniqueName();
+        meta.unique_filename = asset->uniqueFilename();
+        if (asset->is<rive::ImageAsset>()) {
+            meta.type = "image";
+            meta.resolved =
+                asset->as<rive::ImageAsset>()->renderImage() != nullptr;
+        } else if (asset->is<rive::FontAsset>()) {
+            meta.type = "font";
+            meta.resolved = asset->as<rive::FontAsset>()->font() != nullptr;
+        } else if (asset->is<rive::AudioAsset>()) {
+            meta.type = "audio";
+            meta.resolved =
+                asset->as<rive::AudioAsset>()->audioSource() != nullptr;
+        } else {
+            meta.type = "other";
+            meta.resolved = true; // scripts etc. resolve internally
+        }
+        out->m_assets.push_back(std::move(meta));
+    }
+
     return out;
 }
 

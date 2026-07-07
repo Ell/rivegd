@@ -4,6 +4,7 @@
 
 #include "rive/command_queue.hpp"
 
+#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 
@@ -52,6 +53,52 @@ void RiveInstance::create(const Vector2i& p_size) {
     // loadFile -> instantiate -> our init closure -> replayed values keep
     // their order; the server pumps it on the render thread each frame.
     rive::CommandQueue* queue = server->queue();
+
+    // Out-of-band assets (GOALS G3.6): for every referenced-but-unresolved
+    // asset, look for rive's export-convention sibling file
+    // ("<name>-<id>.<ext>" next to the .riv), decode it through the queue,
+    // and register it in the global asset registry BEFORE loadFile — the
+    // queue is one FIFO, so the import sees it. Handle deletion on release
+    // auto-clears the registry entries.
+    const String base_dir = file->get_path().get_base_dir();
+    if (!base_dir.is_empty()) {
+        const Array assets = file->get_asset_descriptions();
+        for (int i = 0; i < assets.size(); ++i) {
+            const Dictionary d = assets[i];
+            if (bool(d["resolved"])) {
+                continue;
+            }
+            const String sibling =
+                base_dir.path_join(String(d["unique_filename"]));
+            if (!FileAccess::file_exists(sibling)) {
+                continue;
+            }
+            const PackedByteArray asset_bytes =
+                FileAccess::get_file_as_bytes(sibling);
+            std::vector<uint8_t> raw(asset_bytes.ptr(),
+                                     asset_bytes.ptr() + asset_bytes.size());
+            const std::string key =
+                String(d["unique_name"]).utf8().get_data();
+            const String type = d["type"];
+            if (type == String("image")) {
+                auto handle = queue->decodeImage(std::move(raw));
+                queue->addGlobalImageAsset(key, handle);
+                oob_handles.push_back(
+                    {0, reinterpret_cast<uint64_t>(handle)});
+            } else if (type == String("font")) {
+                auto handle = queue->decodeFont(std::move(raw));
+                queue->addGlobalFontAsset(key, handle);
+                oob_handles.push_back(
+                    {1, reinterpret_cast<uint64_t>(handle)});
+            } else if (type == String("audio")) {
+                auto handle = queue->decodeAudio(std::move(raw));
+                queue->addGlobalAudioAsset(key, handle);
+                oob_handles.push_back(
+                    {2, reinterpret_cast<uint64_t>(handle)});
+            }
+        }
+    }
+
     const PackedByteArray bytes = file->get_data();
     file_handle = reinterpret_cast<uint64_t>(queue->loadFile(
         std::vector<uint8_t>(bytes.ptr(), bytes.ptr() + bytes.size())));
@@ -70,10 +117,16 @@ void RiveInstance::create(const Vector2i& p_size) {
             machine_name = machines[0];
         }
     }
-    state_machine_handle =
-        reinterpret_cast<uint64_t>(queue->instantiateStateMachineNamed(
-            reinterpret_cast<rive::ArtboardHandle>(artboard_handle),
-            machine_name.utf8().get_data()));
+    // Artboards with no state machines at all (static/animation-only
+    // files) skip instantiation — the queue errors loudly on "".
+    if (machine_name.is_empty()) {
+        state_machine_handle = 0;
+    } else {
+        state_machine_handle =
+            reinterpret_cast<uint64_t>(queue->instantiateStateMachineNamed(
+                reinterpret_cast<rive::ArtboardHandle>(artboard_handle),
+                machine_name.utf8().get_data()));
+    }
     {
         const int64_t id = instance_id;
         const uint64_t fh = file_handle;
@@ -116,10 +169,27 @@ void RiveInstance::release() {
         queue->deleteArtboard(
             reinterpret_cast<rive::ArtboardHandle>(artboard_handle));
         queue->deleteFile(reinterpret_cast<rive::FileHandle>(file_handle));
+        for (const OobHandle& oob : oob_handles) {
+            switch (oob.type) {
+                case 0:
+                    queue->deleteImage(
+                        reinterpret_cast<rive::RenderImageHandle>(oob.handle));
+                    break;
+                case 1:
+                    queue->deleteFont(
+                        reinterpret_cast<rive::FontHandle>(oob.handle));
+                    break;
+                case 2:
+                    queue->deleteAudio(
+                        reinterpret_cast<rive::AudioSourceHandle>(oob.handle));
+                    break;
+            }
+        }
         server->request_pump();
     }
     instance_id = 0;
     file_handle = 0;
+    oob_handles.clear();
     artboard_handle = 0;
     state_machine_handle = 0;
     texture_bound = false;

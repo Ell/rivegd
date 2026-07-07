@@ -36,6 +36,23 @@ PackedStringArray RiveFileResource::get_artboard_names() const {
     return names;
 }
 
+Array RiveFileResource::get_asset_descriptions() const {
+    Array out;
+    if (riv_file == nullptr) {
+        return out;
+    }
+    for (const core::AssetMeta& asset : riv_file->assets()) {
+        Dictionary d;
+        d["name"] = String::utf8(asset.name.c_str());
+        d["unique_name"] = String::utf8(asset.unique_name.c_str());
+        d["unique_filename"] = String::utf8(asset.unique_filename.c_str());
+        d["type"] = String::utf8(asset.type.c_str());
+        d["resolved"] = asset.resolved;
+        out.push_back(d);
+    }
+    return out;
+}
+
 PackedStringArray RiveFileResource::get_state_machine_names(
     const String& p_artboard) const {
     PackedStringArray names;
@@ -172,6 +189,8 @@ void RiveFileResource::_bind_methods() {
                          &RiveFileResource::get_artboard_names);
     ClassDB::bind_method(D_METHOD("get_state_machine_names", "artboard"),
                          &RiveFileResource::get_state_machine_names);
+    ClassDB::bind_method(D_METHOD("get_asset_descriptions"),
+                         &RiveFileResource::get_asset_descriptions);
     ClassDB::bind_method(D_METHOD("get_animation_names", "artboard"),
                          &RiveFileResource::get_animation_names);
     ClassDB::bind_method(
