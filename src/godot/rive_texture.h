@@ -38,6 +38,11 @@ public:
     void set_bool_input(const godot::String& p_name, bool p_value);
     void set_number_input(const godot::String& p_name, double p_value);
     void fire_trigger(const godot::String& p_name);
+
+    // Pointer injection in UV space (0..1 across the texture) — the 3D
+    // path: raycast your mesh, derive the hit UV, forward it here. phase:
+    // 0 = move, 1 = down, 2 = up, 3 = exit.
+    void send_pointer_uv(int p_phase, const godot::Vector2& p_uv);
     void set_property(const godot::String& p_path, const godot::Variant& p_value);
     void fire_property_trigger(const godot::String& p_path);
     void watch_property(const godot::String& p_path);

@@ -223,6 +223,25 @@ Rive shines as UI *over* gameplay. The patterns:
   world-space bar, or a `RiveControl` in a `CanvasLayer` positioned each
   frame from `camera.unproject_position(entity.global_position)`.
 
+### Interactive Rive on 3D surfaces
+
+`RiveTexture` works in any material, and it accepts pointer input in **UV
+space** — so a Rive UI projected onto a mesh (sphere, screen, curved panel)
+stays fully interactive. Raycast the mesh, derive the hit UV, forward it:
+
+```gdscript
+func _on_mesh_clicked(hit_position: Vector3) -> void:
+    var uv := uv_at(hit_position)      # your mesh's UV at the hit point
+    rive_texture.send_pointer_uv(1, uv)  # down
+    rive_texture.send_pointer_uv(2, uv)  # up  -> Rive listeners fire
+```
+
+Phases: 0 move, 1 down, 2 up, 3 exit. Godot raycasts don't return UVs, so
+`uv_at` is per-mesh: analytic for primitives (see the sphere inversion in
+`tests/project/texture3d_smoke.gd`, which pins this whole chain), or
+face-UV interpolation via `MeshDataTool` for arbitrary meshes. Hover works
+too — forward phase 0 from mouse motion for rollover states.
+
 Note today: `RiveControl` is a rectangular hit area — a click on a
 *transparent* region of the artboard doesn't fall through to a control
 directly behind it (use `IGNORE` for display-only overlays, or `STOP` for

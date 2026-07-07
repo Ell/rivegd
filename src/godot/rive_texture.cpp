@@ -46,6 +46,8 @@ void RiveTexture::_bind_methods() {
                          &RiveTexture::set_number_input);
     ClassDB::bind_method(D_METHOD("fire_trigger", "name"),
                          &RiveTexture::fire_trigger);
+    ClassDB::bind_method(D_METHOD("send_pointer_uv", "phase", "uv"),
+                         &RiveTexture::send_pointer_uv);
     ClassDB::bind_method(D_METHOD("set_property", "path", "value"),
                          &RiveTexture::set_property);
     ClassDB::bind_method(D_METHOD("fire_property_trigger", "path"),
@@ -153,6 +155,13 @@ void RiveTexture::set_number_input(const String& p_name, double p_value) {
 
 void RiveTexture::fire_trigger(const String& p_name) {
     rive.fire_trigger(p_name);
+}
+
+void RiveTexture::send_pointer_uv(int p_phase, const Vector2& p_uv) {
+    // UV (0..1) -> texture pixels; RiveInstance::pointer applies the same
+    // contain-fit inverse the 2D nodes use, mapping into artboard space.
+    const Vector2 size = Vector2(render_size);
+    rive.pointer(p_phase, p_uv * size, size);
 }
 
 void RiveTexture::set_property(const String& p_path, const Variant& p_value) {
