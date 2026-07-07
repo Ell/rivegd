@@ -132,6 +132,23 @@ $Menu.state_changed.connect(func(state_name: String):
     print("entered state: ", state_name))
 ```
 
+### Audio
+
+Rive audio events route through a shared engine that Godot's mixer pulls
+from — add a [code]RiveAudioStream[/code] to any `AudioStreamPlayer` (pick
+its bus for mixing/ducking) and play it once at startup:
+
+```gdscript
+var player := AudioStreamPlayer.new()
+player.stream = RiveAudioStream.new()
+player.bus = "SFX"
+add_child(player)
+player.play()
+```
+
+All Rive instances share the engine; without a playing RiveAudioStream,
+Rive audio is silently dropped.
+
 ### Keyboard & focus
 
 `RiveControl` forwards key events (GLFW-mapped) and printable text to Rive's

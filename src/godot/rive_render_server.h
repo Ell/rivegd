@@ -11,6 +11,7 @@
 
 namespace rive {
 class ArtboardInstance;
+class AudioEngine;
 class File;
 class StateMachineInstance;
 template <typename T> class rcp;
@@ -137,6 +138,11 @@ public:
                      int p_index, const godot::String& p_sub_path,
                      const godot::Variant& p_value);
 
+    // Audio-thread entry: mixes Rive's audio into interleaved stereo
+    // floats. Safe once the engine exists (created lazily on the render
+    // thread; guarded by an atomic pointer swap).
+    int mix_audio(float* p_buffer, int p_frames);
+
     // Blocking render for editor thumbnails: safe to call from any
     // non-render thread (the editor's preview thread); posts a one-shot
     // render to the render thread and waits (with timeout).
@@ -171,6 +177,10 @@ private:
     godot::HashMap<int64_t, godot::Array> property_mailbox;
 
     std::atomic<int64_t> next_instance_id{1};
+
+    // Created on the render thread at first instance init; read from the
+    // audio thread via mix_audio. rive::AudioEngine is internally locked.
+    std::atomic<rive::AudioEngine*> audio_engine_raw{nullptr};
 
     std::mutex thumbnail_mutex;
     std::condition_variable thumbnail_done;

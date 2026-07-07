@@ -1,6 +1,7 @@
 #include "godot/register_types.h"
 
 #include "godot/editor/rive_editor_plugin.h"
+#include "godot/rive_audio_stream.h"
 #include "godot/rive_control.h"
 #include "godot/rive_file_loader.h"
 #include "godot/rive_file_resource.h"
@@ -35,6 +36,8 @@ void initialize_rivegd_module(ModuleInitializationLevel p_level) {
     GDREGISTER_CLASS(rivegd::RiveSprite2D);
     GDREGISTER_CLASS(rivegd::RiveControl);
     GDREGISTER_CLASS(rivegd::RiveTexture);
+    GDREGISTER_CLASS(rivegd::RiveAudioStream);
+    GDREGISTER_CLASS(rivegd::RiveAudioStreamPlayback);
     rivegd::RiveRenderServer::create_singleton();
 
     riv_loader.instantiate();

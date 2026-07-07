@@ -31,7 +31,18 @@ env.Append(
 # rive's vulkan headers are guarded by RIVE_VULKAN (set by its premake
 # --with_vulkan build); GL headers select the glad desktop loader via
 # RIVE_DESKTOP_GL. Both must match the stage-1 build.
-env.Append(CPPDEFINES=["RIVE_VULKAN", "RIVE_DESKTOP_GL"])
+env.Append(
+    CPPDEFINES=[
+        "RIVE_VULKAN",
+        "RIVE_DESKTOP_GL",
+        # External audio engine (must match stage 1's
+        # --with_rive_audio=external).
+        "WITH_RIVE_AUDIO",
+        "EXTERNAL_RIVE_AUDIO_ENGINE",
+        "MA_NO_DEVICE_IO",
+        "MA_NO_RESOURCE_MANAGER",
+    ]
+)
 # Link order matters: pls renderer first (uses rive + decoders), then rive,
 # then the (symbol-renamed) vendored deps. Explicit File nodes — SCons strips
 # the "lib" prefix from LIBS names, which turned liblibpng.a into the SYSTEM
@@ -41,8 +52,8 @@ env.Append(
         File(os.path.join(rive_out, "lib%s.a" % name))
         for name in [
             "rive_pls_renderer", "rive_decoders", "rive", "rive_harfbuzz",
-            "rive_sheenbidi", "rive_yoga", "libpng", "libjpeg", "libwebp",
-            "zlib",
+            "rive_sheenbidi", "rive_yoga", "miniaudio", "libpng", "libjpeg",
+            "libwebp", "zlib",
         ]
     ]
 )

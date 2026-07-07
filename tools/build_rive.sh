@@ -26,6 +26,9 @@ CONFIG="${1:-release}"
 cd "$ROOT/thirdparty/rive-runtime/renderer"
 # --with-pic: the archives get linked into a shared library (GDExtension).
 # --with_vulkan: enables the Vulkan RenderContext backend (Phase 1).
-exec ../build/build_rive.sh ninja "$CONFIG" --no-lto --with-pic --with_vulkan -- \
+# --with_rive_audio=external: miniaudio mixes but owns no OS device;
+# Godot's audio server pulls PCM through RiveAudioStream.
+exec ../build/build_rive.sh ninja "$CONFIG" --no-lto --with-pic --with_vulkan \
+    --with_rive_audio=external -- \
     rive rive_pls_renderer rive_decoders rive_harfbuzz rive_sheenbidi \
-    rive_yoga libpng libjpeg libwebp zlib
+    rive_yoga miniaudio libpng libjpeg libwebp zlib

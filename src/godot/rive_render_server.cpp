@@ -5,6 +5,7 @@
 #include "render/vulkan/vulkan_bridge.hpp"
 
 #include "rive/artboard.hpp"
+#include "rive/audio/audio_engine.hpp"
 #include "rive/animation/animation_state.hpp"
 #include "rive/animation/linear_animation.hpp"
 #include "rive/animation/state_machine_input_instance.hpp"
@@ -40,6 +41,7 @@
 #include <godot_cpp/classes/rd_texture_format.hpp>
 #include <godot_cpp/classes/rd_texture_view.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
+#include <godot_cpp/classes/audio_server.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -50,6 +52,12 @@ using namespace godot;
 namespace rivegd {
 
 RiveRenderServer* RiveRenderServer::singleton = nullptr;
+
+// Keeps the engine rcp alive for the server's lifetime.
+static rive::rcp<rive::AudioEngine>& audio_engine_holder() {
+    static rive::rcp<rive::AudioEngine> engine;
+    return engine;
+}
 
 struct RiveRenderServer::Instance {
     rive::rcp<rive::File> file;
@@ -379,6 +387,16 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
     }
     instance->target = bridge->wrap_render_target(
         instance->size.x, instance->size.y, native_a, native_b);
+
+    // Route this artboard's audio events through the shared external
+    // engine (mixed into Godot's audio server via RiveAudioStream).
+    if (audio_engine_raw.load() == nullptr) {
+        rive::rcp<rive::AudioEngine> engine = rive::AudioEngine::Make(
+            2, uint32_t(AudioServer::get_singleton()->get_mix_rate()));
+        audio_engine_holder() = engine;
+        audio_engine_raw.store(engine.get());
+    }
+    instance->artboard->audioEngine(audio_engine_holder());
 
     instance->valid = true;
     instances[p_instance_id] = instance;
@@ -1068,6 +1086,18 @@ void RiveRenderServer::rt_list_set(int64_t p_instance_id, const String& p_path,
     }
     rive::rcp<rive::ViewModelInstanceRuntime> item = list->instanceAt(p_index);
     set_vm_value(item.get(), p_sub_path, p_value);
+}
+
+int RiveRenderServer::mix_audio(float* p_buffer, int p_frames) {
+    rive::AudioEngine* engine = audio_engine_raw.load();
+    if (engine == nullptr) {
+        return 0;
+    }
+    uint64_t frames_read = 0;
+    if (!engine->readAudioFrames(p_buffer, uint64_t(p_frames), &frames_read)) {
+        return 0;
+    }
+    return int(frames_read);
 }
 
 Ref<Image> RiveRenderServer::render_thumbnail(const PackedByteArray& p_data,

@@ -238,8 +238,37 @@ func _process(_delta: float) -> void:
 		if image_a.get_data() == image_b.get_data():
 			fail("pixels did not change after space key on focused element")
 			return
+		_start_audio_phase()
+	elif frames > 660 and frames < 780:
+		if audio_playback != null:
+			audio_peak = max(audio_peak, audio_playback.get_last_peak())
+	elif frames == 780:
+		if audio_peak <= 0.0:
+			fail("no audio flowed through RiveAudioStream (peak 0)")
+			return
+		print("audio peak observed: ", audio_peak)
 		print("API SMOKE OK")
 		get_tree().quit(0)
+
+
+var audio_playback: RiveAudioStreamPlayback
+var audio_peak := 0.0
+
+
+func _start_audio_phase() -> void:
+	key_control.queue_free()
+	# Rive audio: a state-machine timeline fires an AudioEvent; the shared
+	# engine's PCM flows through RiveAudioStream into Godot's mixer.
+	var player := AudioStreamPlayer.new()
+	player.stream = RiveAudioStream.new()
+	add_child(player)
+	player.play()
+	audio_playback = player.get_stream_playback()
+
+	var sound_sprite := RiveSprite2D.new()
+	sound_sprite.file = load("res://fixtures/sound2.riv")
+	sound_sprite.position = Vector2(32, 32)
+	add_child(sound_sprite)
 
 
 var key_control: RiveControl
