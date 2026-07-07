@@ -99,8 +99,12 @@ void GLBridge::begin_frame(uint32_t width, uint32_t height,
     m_context->beginFrame(descriptor);
 }
 
-bool GLBridge::flush_to(rive::gpu::RenderTarget* target,
-                        std::string* out_error) {
+bool GLBridge::begin_batch(std::string*) { return true; }
+
+bool GLBridge::end_batch(std::string*) { return true; }
+
+bool GLBridge::flush_target(rive::gpu::RenderTarget* target,
+                            std::string* out_error) {
     rive::gpu::RenderContext::FlushResources resources{};
     resources.renderTarget = target;
     m_context->flush(resources);

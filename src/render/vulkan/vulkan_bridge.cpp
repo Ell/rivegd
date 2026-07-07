@@ -212,17 +212,16 @@ uint64_t VulkanBridge::update_safe_frame_number() {
     return m_safe_frame_number;
 }
 
-bool VulkanBridge::flush_to(rive::gpu::RenderTarget* target_base,
-                            std::string* out_error) {
-    // Targets handed to this bridge were created by wrap_render_target.
-    auto* target =
-        static_cast<rive::gpu::RenderTargetVulkanImpl*>(target_base);
+bool VulkanBridge::begin_batch(std::string* out_error) {
     auto fail = [&](const char* msg) {
         if (out_error != nullptr) {
             *out_error = msg;
         }
         return false;
     };
+    if (m_active_slot != nullptr) {
+        return fail("begin_batch called twice");
+    }
 
     m_current_frame_number++;
     FrameSlot& slot = m_slots[m_current_frame_number % kFramesInFlight];
@@ -247,10 +246,25 @@ bool VulkanBridge::flush_to(rive::gpu::RenderTarget* target_base,
         VK_SUCCESS) {
         return fail("vkBeginCommandBuffer failed");
     }
+    m_active_slot = &slot;
+    return true;
+}
+
+bool VulkanBridge::flush_target(rive::gpu::RenderTarget* target_base,
+                                std::string* out_error) {
+    // Targets handed to this bridge were created by wrap_render_target.
+    auto* target =
+        static_cast<rive::gpu::RenderTargetVulkanImpl*>(target_base);
+    if (m_active_slot == nullptr) {
+        if (out_error != nullptr) {
+            *out_error = "flush_target outside a batch";
+        }
+        return false;
+    }
 
     rive::gpu::RenderContext::FlushResources resources{};
     resources.renderTarget = target;
-    resources.externalCommandBuffer = slot.command_buffer;
+    resources.externalCommandBuffer = m_active_slot->command_buffer;
     resources.currentFrameNumber = m_current_frame_number;
     resources.safeFrameNumber = update_safe_frame_number();
     m_context->flush(resources);
@@ -258,17 +272,31 @@ bool VulkanBridge::flush_to(rive::gpu::RenderTarget* target_base,
     // Leave the image where Godot's sampler expects it. Rive records the
     // matching barrier because the target tracks its last access.
     target->accessTargetImage(
-        slot.command_buffer,
+        m_active_slot->command_buffer,
         rive::gpu::vkutil::ImageAccess{
             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             VK_ACCESS_SHADER_READ_BIT,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         });
+    return true;
+}
+
+bool VulkanBridge::end_batch(std::string* out_error) {
+    auto fail = [&](const char* msg) {
+        if (out_error != nullptr) {
+            *out_error = msg;
+        }
+        return false;
+    };
+    if (m_active_slot == nullptr) {
+        return fail("end_batch outside a batch");
+    }
+    FrameSlot& slot = *m_active_slot;
+    m_active_slot = nullptr;
 
     if (m_fns.EndCommandBuffer(slot.command_buffer) != VK_SUCCESS) {
         return fail("vkEndCommandBuffer failed");
     }
-
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.commandBufferCount = 1;

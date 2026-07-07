@@ -65,7 +65,10 @@ public:
                           const godot::String& p_artboard,
                           const godot::String& p_state_machine,
                           const godot::Vector2i& p_size);
-    void rt_frame(int64_t p_instance_id, double p_delta);
+    void rt_frame(int64_t p_instance_id, double p_delta); // advance only
+    // Renders every instance that needs it in one batch (one submission).
+    // Posted once per engine frame from the frame_pre_draw hook.
+    void rt_flush_all();
     void rt_free_instance(int64_t p_instance_id);
     void rt_set_bool(int64_t p_instance_id, const godot::String& p_name,
                      bool p_value);
@@ -140,6 +143,9 @@ protected:
 private:
     struct Instance;
 
+    void on_frame_pre_draw(); // main thread: posts rt_flush_all
+    void rt_render_instance(int64_t p_instance_id, Instance* p_instance);
+
     bool rt_ensure_bridge();
 
     static RiveRenderServer* singleton;
@@ -147,6 +153,7 @@ private:
     std::unique_ptr<render::RenderBridge> bridge; // render thread only
     godot::HashMap<int64_t, Instance*> instances; // render thread only
     bool bridge_failed = false;                   // render thread only
+    bool frame_hook_connected = false;            // main thread only
 
     std::mutex mailbox_mutex;
     godot::HashMap<int64_t, godot::RID> texture_mailbox;

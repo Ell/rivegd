@@ -32,13 +32,18 @@ public:
         uint64_t native_handle_a,
         uint64_t native_handle_b) = 0;
 
-    // Frame sequence: begin_frame -> draw with a RiveRenderer -> flush_to.
+    // Frame sequence (one batch per engine frame, N targets per batch):
+    //   begin_batch()
+    //     { begin_frame -> draw with a RiveRenderer -> flush_target } x N
+    //   end_batch()  // single submission
     // All frame methods run on the thread that owns the graphics queue.
+    virtual bool begin_batch(std::string* out_error) = 0;
     virtual void begin_frame(uint32_t width,
                              uint32_t height,
                              uint32_t clear_color_argb) = 0;
-    virtual bool flush_to(rive::gpu::RenderTarget* target,
-                          std::string* out_error) = 0;
+    virtual bool flush_target(rive::gpu::RenderTarget* target,
+                              std::string* out_error) = 0;
+    virtual bool end_batch(std::string* out_error) = 0;
 
     // Blocks until in-flight GPU work completes (teardown path).
     virtual void wait_idle() = 0;

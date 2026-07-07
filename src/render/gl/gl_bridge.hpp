@@ -25,10 +25,12 @@ public:
         uint64_t native_handle_a,
         uint64_t native_handle_b) override;
 
+    bool begin_batch(std::string* out_error) override;
     void begin_frame(uint32_t width, uint32_t height,
                      uint32_t clear_color_argb) override;
-    bool flush_to(rive::gpu::RenderTarget* target,
-                  std::string* out_error) override;
+    bool flush_target(rive::gpu::RenderTarget* target,
+                      std::string* out_error) override;
+    bool end_batch(std::string* out_error) override;
     void wait_idle() override;
 
 private:

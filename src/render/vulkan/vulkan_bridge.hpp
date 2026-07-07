@@ -59,15 +59,15 @@ public:
         VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
         VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-    // Frame sequence: begin_frame() -> draw with a RiveRenderer -> flush_to().
+    // Batch = one command buffer + one queue submission for all targets.
+    bool begin_batch(std::string* out_error) override;
     void begin_frame(uint32_t width, uint32_t height,
                      uint32_t clear_color_argb) override;
-
-    // Records this frame's draws into a command buffer, transitions the
-    // target to SHADER_READ_ONLY_OPTIMAL (so Godot can sample it), and
-    // submits on Godot's queue. Returns false on device error.
-    bool flush_to(rive::gpu::RenderTarget* target,
-                  std::string* out_error) override;
+    // Records the accumulated draws for one target and transitions it to
+    // SHADER_READ_ONLY_OPTIMAL (so Godot can sample it).
+    bool flush_target(rive::gpu::RenderTarget* target,
+                      std::string* out_error) override;
+    bool end_batch(std::string* out_error) override;
 
     // Blocks until all in-flight flushes complete (teardown path).
     void wait_idle() override;
@@ -101,7 +101,7 @@ private:
         PFN_vkDeviceWaitIdle DeviceWaitIdle = nullptr;
     } m_fns;
 
-    static constexpr int kFramesInFlight = 4;
+    static constexpr int kFramesInFlight = 16; // chunked batches: several submits/frame
     struct FrameSlot {
         VkCommandBuffer command_buffer = VK_NULL_HANDLE;
         VkFence fence = VK_NULL_HANDLE;
@@ -112,6 +112,7 @@ private:
 
     uint64_t m_current_frame_number = 0;
     uint64_t m_safe_frame_number = 0;
+    FrameSlot* m_active_slot = nullptr;
 
     std::unique_ptr<rive::gpu::RenderContext> m_context;
 };

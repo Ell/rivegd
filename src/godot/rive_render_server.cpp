@@ -39,6 +39,7 @@
 #include <godot_cpp/classes/rd_texture_format.hpp>
 #include <godot_cpp/classes/rd_texture_view.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
+#include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -118,14 +119,27 @@ RiveRenderServer* RiveRenderServer::get_singleton() { return singleton; }
 void RiveRenderServer::create_singleton() {
     if (singleton == nullptr) {
         singleton = memnew(RiveRenderServer);
+        // frame_pre_draw is connected lazily (allocate_instance_id):
+        // RenderingServer does not exist yet at extension-init time.
     }
 }
 
 void RiveRenderServer::free_singleton() {
     if (singleton != nullptr) {
+        if (singleton->frame_hook_connected &&
+            RenderingServer::get_singleton() != nullptr) {
+            RenderingServer::get_singleton()->disconnect(
+                "frame_pre_draw",
+                callable_mp(singleton, &RiveRenderServer::on_frame_pre_draw));
+        }
         memdelete(singleton);
         singleton = nullptr;
     }
+}
+
+void RiveRenderServer::on_frame_pre_draw() {
+    RenderingServer::get_singleton()->call_on_render_thread(
+        callable_mp(this, &RiveRenderServer::rt_flush_all));
 }
 
 void RiveRenderServer::_bind_methods() {
@@ -140,6 +154,12 @@ void RiveRenderServer::_bind_methods() {
 }
 
 int64_t RiveRenderServer::allocate_instance_id() {
+    if (!frame_hook_connected) {
+        frame_hook_connected = true;
+        RenderingServer::get_singleton()->connect(
+            "frame_pre_draw",
+            callable_mp(this, &RiveRenderServer::on_frame_pre_draw));
+    }
     return next_instance_id.fetch_add(1);
 }
 
@@ -474,12 +494,11 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
             mailbox.append_array(changes);
         }
     }
+    // Rendering happens in rt_flush_all — one batch for all instances.
+}
 
-    if (!instance->needs_render) {
-        return; // sleeping: settled machine, no external changes
-    }
-    instance->needs_render = false;
-
+void RiveRenderServer::rt_render_instance(int64_t p_instance_id,
+                                          Instance* instance) {
     bridge->begin_frame(instance->size.x, instance->size.y, 0x00000000);
 
     rive::RiveRenderer renderer(bridge->render_context());
@@ -492,9 +511,63 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
     renderer.restore();
 
     std::string error;
-    if (!bridge->flush_to(instance->target.get(), &error)) {
+    if (!bridge->flush_target(instance->target.get(), &error)) {
         ERR_PRINT(String("rivegd: flush failed: ") + String::utf8(error.c_str()));
         instance->valid = false;
+    }
+}
+
+void RiveRenderServer::rt_flush_all() {
+    if (bridge == nullptr || instances.is_empty()) {
+        return;
+    }
+    bool any = false;
+    for (const KeyValue<int64_t, Instance*>& entry : instances) {
+        if (entry.value->valid && entry.value->needs_render) {
+            any = true;
+            break;
+        }
+    }
+    if (!any) {
+        return; // everything is sleeping
+    }
+
+    // Submitting in chunks keeps the GPU fed while the CPU records the
+    // next chunk (a single giant batch measurably regresses frame time on
+    // fast GPUs; per-instance submits waste submissions on slow ones).
+    static int chunk_size = [] {
+        const String env = OS::get_singleton()->get_environment(
+            "RIVEGD_BATCH_SIZE");
+        const int parsed = env.to_int();
+        return parsed > 0 ? parsed : 4;
+    }();
+
+    std::string error;
+    int in_chunk = 0;
+    if (!bridge->begin_batch(&error)) {
+        ERR_PRINT(String("rivegd: begin_batch failed: ") +
+                  String::utf8(error.c_str()));
+        return;
+    }
+    for (const KeyValue<int64_t, Instance*>& entry : instances) {
+        Instance* instance = entry.value;
+        if (!instance->valid || !instance->needs_render) {
+            continue;
+        }
+        instance->needs_render = false;
+        rt_render_instance(entry.key, instance);
+        if (++in_chunk >= chunk_size) {
+            in_chunk = 0;
+            if (!bridge->end_batch(&error) || !bridge->begin_batch(&error)) {
+                ERR_PRINT(String("rivegd: batch split failed: ") +
+                          String::utf8(error.c_str()));
+                return;
+            }
+        }
+    }
+    if (!bridge->end_batch(&error)) {
+        ERR_PRINT(String("rivegd: end_batch failed: ") +
+                  String::utf8(error.c_str()));
     }
 }
 
@@ -972,6 +1045,7 @@ void RiveRenderServer::rt_render_thumbnail(const PackedByteArray& p_data,
     rt_init_instance(id, p_data, String(), String(), p_size);
     if (instances.has(id)) {
         rt_frame(id, 0.0);
+        rt_flush_all();
         if (bridge != nullptr) {
             bridge->wait_idle();
         }
