@@ -169,7 +169,13 @@ void RiveTexture::on_frame_pre_draw() {
         rive.frame(delta);
     }
     if (rive.update_texture_binding()) {
-        set_texture_rd_rid(rive.get_texture()->get_texture_rd_rid());
+        if (rive.get_rd_texture_rid().is_valid()) {
+            set_texture_rd_rid(rive.get_rd_texture_rid());
+        } else {
+            ERR_PRINT_ONCE("rivegd: RiveTexture needs a RenderingDevice "
+                           "renderer (Forward+/Mobile); use RiveSprite2D or "
+                           "RiveControl under Compatibility.");
+        }
     }
     Array events = rive.take_events();
     for (int i = 0; i < events.size(); ++i) {

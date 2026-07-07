@@ -19,9 +19,6 @@ void RiveInstance::create(const Vector2i& p_size) {
     if (server == nullptr) {
         return;
     }
-    if (texture.is_null()) {
-        texture.instantiate();
-    }
     instance_id = server->allocate_instance_id();
     RenderingServer::get_singleton()->call_on_render_thread(
         callable_mp(server, &RiveRenderServer::rt_init_instance)
@@ -53,9 +50,8 @@ void RiveInstance::release() {
     }
     instance_id = 0;
     texture_bound = false;
-    if (texture.is_valid()) {
-        texture->set_texture_rd_rid(RID());
-    }
+    canvas_texture = RID();
+    rd_texture = RID();
 }
 
 void RiveInstance::frame(double p_delta) {
@@ -73,11 +69,12 @@ bool RiveInstance::update_texture_binding() {
         return false;
     }
     RiveRenderServer* server = RiveRenderServer::get_singleton();
-    RID rid = server->get_texture_rid(instance_id);
+    RID rid = server->get_canvas_texture_rid(instance_id);
     if (!rid.is_valid()) {
         return false;
     }
-    texture->set_texture_rd_rid(rid);
+    canvas_texture = rid;
+    rd_texture = server->get_texture_rid(instance_id);
     texture_bound = true;
     return true;
 }

@@ -4,6 +4,7 @@
 
 #include <godot_cpp/classes/input_event_mouse_button.hpp>
 #include <godot_cpp/classes/input_event_mouse_motion.hpp>
+#include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/core/class_db.hpp>
 
 using namespace godot;
@@ -260,10 +261,10 @@ void RiveControl::_notification(int p_what) {
             }
         } break;
         case NOTIFICATION_DRAW: {
-            if (rive.get_texture().is_valid() &&
-                rive.get_texture()->get_texture_rd_rid().is_valid()) {
-                draw_texture_rect(rive.get_texture(),
-                                  Rect2(Vector2(), get_size()), false);
+            if (rive.get_canvas_texture_rid().is_valid()) {
+                RenderingServer::get_singleton()->canvas_item_add_texture_rect(
+                    get_canvas_item(), Rect2(Vector2(), get_size()),
+                    rive.get_canvas_texture_rid());
             }
         } break;
     }

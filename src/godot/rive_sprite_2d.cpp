@@ -1,5 +1,6 @@
 #include "godot/rive_sprite_2d.h"
 
+#include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/core/class_db.hpp>
 
 using namespace godot;
@@ -215,10 +216,10 @@ void RiveSprite2D::_notification(int p_what) {
             }
         } break;
         case NOTIFICATION_DRAW: {
-            if (rive.get_texture().is_valid() &&
-                rive.get_texture()->get_texture_rd_rid().is_valid()) {
-                draw_texture_rect(rive.get_texture(),
-                                  Rect2(Vector2(), Vector2(size)), false);
+            if (rive.get_canvas_texture_rid().is_valid()) {
+                RenderingServer::get_singleton()->canvas_item_add_texture_rect(
+                    get_canvas_item(), Rect2(Vector2(), Vector2(size)),
+                    rive.get_canvas_texture_rid());
             }
         } break;
     }

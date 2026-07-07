@@ -40,8 +40,9 @@ public:
     // Main thread: reserve an instance id.
     int64_t allocate_instance_id();
 
-    // Main thread: RID mailbox (filled by rt_init_instance).
-    godot::RID get_texture_rid(int64_t p_instance_id);
+    // Main thread: RID mailboxes (filled by rt_init_instance).
+    godot::RID get_texture_rid(int64_t p_instance_id);        // RD texture
+    godot::RID get_canvas_texture_rid(int64_t p_instance_id); // RS texture
 
     // Main thread: drain events reported since the last call (Array of
     // Dictionaries: { name, seconds_delay, properties }).
@@ -108,6 +109,7 @@ private:
 
     std::mutex mailbox_mutex;
     godot::HashMap<int64_t, godot::RID> texture_mailbox;
+    godot::HashMap<int64_t, godot::RID> canvas_texture_mailbox;
     godot::HashMap<int64_t, godot::Array> event_mailbox;
     godot::HashMap<int64_t, godot::Array> state_mailbox;
     godot::HashMap<int64_t, godot::Array> property_mailbox;

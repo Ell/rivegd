@@ -1,5 +1,6 @@
 #include "godot/rive_render_server.h"
 
+#include "render/gl/gl_bridge.hpp"
 #include "render/render_bridge.hpp"
 #include "render/vulkan/vulkan_bridge.hpp"
 
@@ -27,6 +28,7 @@
 #include "rive/math/mat2d.hpp"
 #include "rive/renderer/rive_renderer.hpp"
 
+#include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/rd_texture_format.hpp>
 #include <godot_cpp/classes/rd_texture_view.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
@@ -46,7 +48,8 @@ struct RiveRenderServer::Instance {
     std::unique_ptr<rive::StateMachineInstance> state_machine;
     rive::rcp<rive::ViewModelInstanceRuntime> view_model;
     rive::rcp<rive::gpu::RenderTarget> target;
-    RID rd_texture;
+    RID rd_texture; // RD-path only
+    RID rs_texture; // RS-level texture, valid on every backend
     Vector2i size;
     bool valid = false;
 
@@ -122,6 +125,12 @@ RID RiveRenderServer::get_texture_rid(int64_t p_instance_id) {
     return rid != nullptr ? *rid : RID();
 }
 
+RID RiveRenderServer::get_canvas_texture_rid(int64_t p_instance_id) {
+    std::lock_guard<std::mutex> lock(mailbox_mutex);
+    const RID* rid = canvas_texture_mailbox.getptr(p_instance_id);
+    return rid != nullptr ? *rid : RID();
+}
+
 Array RiveRenderServer::take_events(int64_t p_instance_id) {
     std::lock_guard<std::mutex> lock(mailbox_mutex);
     Array* events = event_mailbox.getptr(p_instance_id);
@@ -174,11 +183,26 @@ bool RiveRenderServer::rt_ensure_bridge() {
         return false;
     }
 
-    RenderingDevice* rd = RenderingServer::get_singleton()->get_rendering_device();
+    RenderingServer* rs = RenderingServer::get_singleton();
+    RenderingDevice* rd = rs->get_rendering_device();
     if (rd == nullptr) {
+        // Compatibility renderer (or headless). GL shares Godot's context;
+        // we are on the thread that owns it (render thread).
+        const String driver = rs->get_current_rendering_driver_name();
+        if (driver.begins_with("opengl")) {
+            std::string error;
+            bridge = render::GLBridge::create(&error);
+            if (bridge == nullptr) {
+                bridge_failed = true;
+                ERR_PRINT(String("rivegd: GL bridge init failed: ") +
+                          String::utf8(error.c_str()));
+                return false;
+            }
+            return true;
+        }
         bridge_failed = true;
-        ERR_PRINT("rivegd: no RenderingDevice (Compatibility renderer or "
-                  "headless); Rive rendering is unavailable.");
+        ERR_PRINT("rivegd: no RenderingDevice and driver '" + driver +
+                  "' is unsupported; Rive rendering is unavailable.");
         return false;
     }
     render::GodotVulkanHandles handles;
@@ -262,35 +286,54 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
             new rive::ViewModelInstanceRuntime(vmi));
     }
 
-    // Create the shared texture through Godot's RD so the scene side can
-    // sample it via Texture2DRD; hand its VkImage to Rive as render target.
-    RenderingDevice* rd = RenderingServer::get_singleton()->get_rendering_device();
-    Ref<RDTextureFormat> format;
-    format.instantiate();
-    format->set_format(RenderingDevice::DATA_FORMAT_R8G8B8A8_UNORM);
-    format->set_width(instance->size.x);
-    format->set_height(instance->size.y);
-    format->set_usage_bits(RenderingDevice::TEXTURE_USAGE_SAMPLING_BIT |
-                           RenderingDevice::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT |
-                           RenderingDevice::TEXTURE_USAGE_STORAGE_BIT |
-                           RenderingDevice::TEXTURE_USAGE_CAN_COPY_FROM_BIT |
-                           RenderingDevice::TEXTURE_USAGE_CAN_COPY_TO_BIT);
-    Ref<RDTextureView> view;
-    view.instantiate();
-    instance->rd_texture = rd->texture_create(format, view);
-    if (!instance->rd_texture.is_valid()) {
-        ERR_PRINT("rivegd: RD texture_create failed");
-        memdelete(instance);
-        return;
+    // Create the shared texture and hand its native handle(s) to Rive.
+    // RD path: RD texture (VkImage/view), surfaced to the scene through an
+    // RS wrapper (texture_rd_create). GL path: an RS texture whose GL id we
+    // render into directly.
+    RenderingServer* rs = RenderingServer::get_singleton();
+    RenderingDevice* rd = rs->get_rendering_device();
+    uint64_t native_a = 0;
+    uint64_t native_b = 0;
+    if (rd != nullptr) {
+        Ref<RDTextureFormat> format;
+        format.instantiate();
+        format->set_format(RenderingDevice::DATA_FORMAT_R8G8B8A8_UNORM);
+        format->set_width(instance->size.x);
+        format->set_height(instance->size.y);
+        format->set_usage_bits(
+            RenderingDevice::TEXTURE_USAGE_SAMPLING_BIT |
+            RenderingDevice::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT |
+            RenderingDevice::TEXTURE_USAGE_STORAGE_BIT |
+            RenderingDevice::TEXTURE_USAGE_CAN_COPY_FROM_BIT |
+            RenderingDevice::TEXTURE_USAGE_CAN_COPY_TO_BIT);
+        Ref<RDTextureView> view;
+        view.instantiate();
+        instance->rd_texture = rd->texture_create(format, view);
+        if (!instance->rd_texture.is_valid()) {
+            ERR_PRINT("rivegd: RD texture_create failed");
+            memdelete(instance);
+            return;
+        }
+        instance->rs_texture = rs->texture_rd_create(instance->rd_texture);
+        native_a = rd->get_driver_resource(
+            RenderingDevice::DRIVER_RESOURCE_VULKAN_IMAGE,
+            instance->rd_texture, 0);
+        native_b = rd->get_driver_resource(
+            RenderingDevice::DRIVER_RESOURCE_VULKAN_IMAGE_VIEW,
+            instance->rd_texture, 0);
+    } else {
+        Ref<Image> placeholder = Image::create_empty(
+            instance->size.x, instance->size.y, false, Image::FORMAT_RGBA8);
+        instance->rs_texture = rs->texture_2d_create(placeholder);
+        if (!instance->rs_texture.is_valid()) {
+            ERR_PRINT("rivegd: RS texture_2d_create failed");
+            memdelete(instance);
+            return;
+        }
+        native_a = rs->texture_get_native_handle(instance->rs_texture);
     }
-
-    uint64_t vk_image = rd->get_driver_resource(
-        RenderingDevice::DRIVER_RESOURCE_VULKAN_IMAGE, instance->rd_texture, 0);
-    uint64_t vk_image_view = rd->get_driver_resource(
-        RenderingDevice::DRIVER_RESOURCE_VULKAN_IMAGE_VIEW,
-        instance->rd_texture, 0);
     instance->target = bridge->wrap_render_target(
-        instance->size.x, instance->size.y, vk_image, vk_image_view);
+        instance->size.x, instance->size.y, native_a, native_b);
 
     instance->valid = true;
     instances[p_instance_id] = instance;
@@ -298,6 +341,7 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
     {
         std::lock_guard<std::mutex> lock(mailbox_mutex);
         texture_mailbox[p_instance_id] = instance->rd_texture;
+        canvas_texture_mailbox[p_instance_id] = instance->rs_texture;
     }
 }
 
@@ -644,6 +688,7 @@ void RiveRenderServer::rt_free_instance(int64_t p_instance_id) {
     {
         std::lock_guard<std::mutex> lock(mailbox_mutex);
         texture_mailbox.erase(p_instance_id);
+        canvas_texture_mailbox.erase(p_instance_id);
         event_mailbox.erase(p_instance_id);
         state_mailbox.erase(p_instance_id);
         property_mailbox.erase(p_instance_id);
@@ -651,6 +696,9 @@ void RiveRenderServer::rt_free_instance(int64_t p_instance_id) {
     if (bridge != nullptr) {
         // GPU may still be reading the target from the last flush.
         bridge->wait_idle();
+    }
+    if (instance->rs_texture.is_valid()) {
+        RenderingServer::get_singleton()->free_rid(instance->rs_texture);
     }
     if (instance->rd_texture.is_valid()) {
         RenderingDevice* rd =

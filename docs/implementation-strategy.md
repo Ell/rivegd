@@ -23,7 +23,7 @@ The renderer's integration surface is `rive::gpu::RenderContext` — one API-agn
 | Forward+ / Mobile (Windows, Linux, Android) | Vulkan | `RenderContextVulkanImpl` |
 | Forward+ / Mobile (macOS, iOS) | Metal | `RenderContextMetalImpl` |
 | Forward+ (Windows, opt-in) | D3D12 | `RenderContextD3DImpl` (12) |
-| Compatibility (all desktop/mobile) | GL / GLES3 | `RenderContextGLImpl` |
+| Compatibility (Android GLES3; NOT desktop) | GLES3 | `RenderContextGLImpl` (desktop Compatibility is GL 3.3 core — below rive's 4.2 desktop floor) |
 | Web export (Compatibility only) | WebGL2 | `RenderContextGLImpl` (Emscripten) |
 
 **Important refuted claim:** Godot's `RenderingDevice` is *not* an RHI-style host that hands extensions raw command-stream control. The integration does not "port Rive onto RenderingDevice"; instead it bootstraps Rive's own backend on the **same native device** Godot created, renders to an offscreen target, and hands the result back as a texture.

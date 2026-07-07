@@ -2,7 +2,6 @@
 
 #include "godot/rive_file_resource.h"
 
-#include <godot_cpp/classes/texture2drd.hpp>
 #include <godot_cpp/templates/hash_map.hpp>
 #include <godot_cpp/variant/variant.hpp>
 
@@ -28,9 +27,12 @@ public:
 
     void frame(double p_delta);
 
-    // Polls the RID mailbox; returns true the moment the texture binds.
+    // Polls the RID mailboxes; returns true the moment the texture binds.
     bool update_texture_binding();
-    godot::Ref<godot::Texture2DRD> get_texture() const { return texture; }
+    // RS-level texture (canvas drawing; valid on every backend).
+    godot::RID get_canvas_texture_rid() const { return canvas_texture; }
+    // Raw RD texture (Texture2DRD path; empty under the GL backend).
+    godot::RID get_rd_texture_rid() const { return rd_texture; }
 
     godot::Array take_events();
     godot::Array take_state_changes();
@@ -63,7 +65,8 @@ private:
     void post_input(const godot::String& p_name, const godot::Variant& p_value);
 
     int64_t instance_id = 0;
-    godot::Ref<godot::Texture2DRD> texture;
+    godot::RID canvas_texture;
+    godot::RID rd_texture;
     bool texture_bound = false;
     void post_property(const godot::String& p_path,
                        const godot::Variant& p_value);

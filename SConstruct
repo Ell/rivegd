@@ -20,10 +20,18 @@ if not os.path.isdir(rive_out):
     print("Run tools/build_rive.sh first (see docs/development-and-testing.md).")
     Exit(1)
 
-env.Append(CPPPATH=["thirdparty/rive-runtime/renderer/include"])
+env.Append(
+    CPPPATH=[
+        "thirdparty/rive-runtime/renderer/include",
+        # glad GL loader headers (GL bridge / Compatibility backend)
+        "thirdparty/rive-runtime/renderer/glad/include",
+        "thirdparty/rive-runtime/renderer/glad",
+    ]
+)
 # rive's vulkan headers are guarded by RIVE_VULKAN (set by its premake
-# --with_vulkan build; we must match).
-env.Append(CPPDEFINES=["RIVE_VULKAN"])
+# --with_vulkan build); GL headers select the glad desktop loader via
+# RIVE_DESKTOP_GL. Both must match the stage-1 build.
+env.Append(CPPDEFINES=["RIVE_VULKAN", "RIVE_DESKTOP_GL"])
 # Link order matters: pls renderer first (uses rive + decoders), then rive,
 # then the (symbol-renamed) vendored deps. Explicit File nodes — SCons strips
 # the "lib" prefix from LIBS names, which turned liblibpng.a into the SYSTEM

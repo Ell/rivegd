@@ -6,11 +6,13 @@ and [`ux-design.md`](ux-design.md).
 
 ## Current requirements & limitations
 
-- **Godot 4.7+, Forward+ or Mobile rendering method (Vulkan).** The
-  Compatibility (OpenGL) renderer, macOS/iOS (Metal), D3D12, and web exports
-  are on the roadmap (GOALS G1.3/G2) but not implemented yet — on those,
-  `.riv` files still load and state machines still advance (logic-only), but
-  nothing renders.
+- **Godot 4.7+, Forward+ or Mobile rendering method (Vulkan).**
+  macOS/iOS (Metal), D3D12, Android GLES3, and web are on the roadmap
+  (GOALS G1.3/G2). A GL/GLES backend is already built in, but **desktop
+  Compatibility cannot render**: Godot creates a GL 3.3 core context and
+  rive's desktop-GL minimum is 4.2 (GLES minimum is 3.0, so Android/web
+  qualify). Unsupported renderers degrade to logic-only: `.riv` files load
+  and state machines advance, nothing draws.
 - Prebuilt binaries: Linux x86_64 only so far (CI artifacts). Other desktop
   platforms build from source (below).
 - Data binding: typed writes, watch-based reads, and per-path change
