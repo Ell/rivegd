@@ -24,6 +24,7 @@ struct InputMeta {
 struct VmPropertyMeta {
     std::string name;
     std::string type; // "number" | "string" | "boolean" | "color" | "trigger" | "enum"
+    std::vector<std::string> enum_values; // filled for type == "enum"
 };
 
 struct StateMachineMeta {

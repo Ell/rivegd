@@ -267,6 +267,8 @@ void RiveInstance::get_property_list(List<PropertyInfo>* p_list) const {
         Dictionary description = vm_properties[i];
         const String type = description["type"];
         Variant::Type variant_type = Variant::NIL;
+        PropertyHint hint = PROPERTY_HINT_NONE;
+        String hint_string;
         if (type == "number") {
             variant_type = Variant::FLOAT;
         } else if (type == "boolean") {
@@ -275,8 +277,12 @@ void RiveInstance::get_property_list(List<PropertyInfo>* p_list) const {
             variant_type = Variant::STRING;
         } else if (type == "color") {
             variant_type = Variant::COLOR;
+        } else if (type == "enum" && description.has("enum_values")) {
+            variant_type = Variant::STRING;
+            hint = PROPERTY_HINT_ENUM;
+            hint_string = String(",").join(description["enum_values"]);
         } else {
-            continue; // triggers/enums/nested: script-only for now
+            continue; // triggers/lists/images/nested: script-only for now
         }
         if (!group_added) {
             p_list->push_back(PropertyInfo(Variant::NIL, "Data Binding",
@@ -285,7 +291,8 @@ void RiveInstance::get_property_list(List<PropertyInfo>* p_list) const {
             group_added = true;
         }
         p_list->push_back(PropertyInfo(
-            variant_type, String(kPropertyPrefix) + String(description["name"])));
+            variant_type, String(kPropertyPrefix) + String(description["name"]),
+            hint, hint_string));
     }
 }
 

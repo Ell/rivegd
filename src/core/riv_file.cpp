@@ -4,6 +4,8 @@
 #include "rive/animation/state_machine_instance.hpp"
 #include "rive/artboard.hpp"
 #include "rive/data_bind/data_values/data_type.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_enum_runtime.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_runtime.hpp"
 #include "utils/no_op_factory.hpp"
 
@@ -95,6 +97,9 @@ std::unique_ptr<RivFile> RivFile::import(const uint8_t* data,
             rive::ViewModelRuntime* view_model =
                 out->m_file->defaultArtboardViewModel(instance.get());
             if (view_model != nullptr) {
+                // Temp instance for probing enum option lists.
+                rive::rcp<rive::ViewModelInstanceRuntime> probe =
+                    view_model->createInstance();
                 for (const rive::PropertyData& property :
                      view_model->properties()) {
                     const char* type = nullptr;
@@ -108,8 +113,18 @@ std::unique_ptr<RivFile> RivFile::import(const uint8_t* data,
                         default: break; // nested VMs/lists: not yet exposed
                     }
                     if (type != nullptr) {
+                        VmPropertyMeta property_meta;
+                        property_meta.name = property.name;
+                        property_meta.type = type;
+                        if (property.type == rive::DataType::enumType &&
+                            probe != nullptr) {
+                            if (auto* e =
+                                    probe->propertyEnum(property.name)) {
+                                property_meta.enum_values = e->values();
+                            }
+                        }
                         meta.view_model_properties.push_back(
-                            {property.name, type});
+                            std::move(property_meta));
                     }
                 }
             }

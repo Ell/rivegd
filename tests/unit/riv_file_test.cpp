@@ -108,6 +108,30 @@ TEST_CASE("data_binding_test.riv exposes view model properties in metadata") {
     REQUIRE(found_width);
 }
 
+TEST_CASE("enum view model properties carry their option lists") {
+    auto bytes = read_file(FIXTURE("data_binding_test.riv"));
+    auto file = rivegd::core::RivFile::import(bytes.data(), bytes.size());
+    REQUIRE(file != nullptr);
+
+    const auto* artboard = file->find_artboard("artboard-2");
+    REQUIRE(artboard != nullptr);
+    bool found_enum = false;
+    bool found_trigger = false;
+    for (const auto& property : artboard->view_model_properties) {
+        if (property.name == "state" && property.type == "enum") {
+            found_enum = true;
+            REQUIRE(property.enum_values ==
+                    std::vector<std::string>{"state-red", "state-green",
+                                             "state-blue"});
+        }
+        if (property.name == "trigger-prop" && property.type == "trigger") {
+            found_trigger = true;
+        }
+    }
+    REQUIRE(found_enum);
+    REQUIRE(found_trigger);
+}
+
 TEST_CASE("headless advance: instance a state machine and run it") {
     auto bytes = read_file(FIXTURE("bullet_man.riv"));
     auto file = rivegd::core::RivFile::import(bytes.data(), bytes.size());

@@ -35,7 +35,22 @@ Design rationale and evidence live in [`docs/implementation-strategy.md`](docs/i
 - **G4.1** Node types: `RiveSprite2D` (Node2D), `RiveControl` (Control), plus `RiveTexture` for any texture slot (3D materials, TextureRect, shaders, particles).
 - **G4.2** State machine inputs and view-model (data binding) properties are **real Godot properties** — inspector-editable (checkboxes/sliders/trigger buttons/color pickers/enum dropdowns), animatable by AnimationPlayer, tweenable.
 - **G4.3** Script callbacks, three tiers: signals (`rive_event`, `state_changed`, `animation_finished`, `input_changed`, `rive_audio_event`), targeted Callables (`on_event(name, callable)`, `bind_property(path, callable)` with subscription handles), and awaiters (`await rive.event_fired("...")`).
-- **G4.4** Data binding is first-class: typed, path-addressed view-model properties (number/string/bool/color/enum/trigger/list/image/nested), two-way, with change signals. This is the primary Rive↔game contract.
+- **G4.4** Data binding is first-class: typed, path-addressed view-model properties, two-way, with change signals. This is the primary Rive↔game contract, and coverage means **every** view-model type Rive can author, each mapped to an idiomatic Godot type:
+
+  | Rive VM type | Godot mapping | Status |
+  |---|---|---|
+  | number | `float` (set/get/watch/inspector) | ✅ |
+  | boolean | `bool` (set/get/watch/inspector) | ✅ |
+  | string | `String` (set/get/watch/inspector) | ✅ |
+  | color | `Color` (set/get/watch/inspector) | ✅ |
+  | trigger | `fire_property_trigger()` + watchable (signal when Rive fires it) | ⏳ fire only |
+  | enum | `String` value + inspector dropdown from the file's enum values | ⏳ |
+  | nested viewModel | slash paths (`"a/b/c"`) into nested properties; instance swapping by name | ✅ paths / ⏳ swapping |
+  | list | `Array`-like API: size/get/add/remove/swap of VM instances | ⏳ |
+  | image | assign a Godot `Image`/`Texture2D` (decoded through the render context factory) | ⏳ |
+  | artboard | assign bindable artboards by name | ⏳ |
+
+  Inspector exposure follows the same rule: if Rive can author it, it shows up (scalars as fields today; enums as dropdowns, triggers as buttons, lists/images via the inspector plugin).
 - **G4.5** Time is Godot time: `process_callback` (idle/physics/**manual** `advance(delta)`), `speed_scale`, `Engine.time_scale`, standard `process_mode` pause inheritance. Godot Timers/Tweens compose with no special casing.
 - **G4.6** Efficiency defaults: `pause_when_hidden`, settled state machines sleep until an input or pointer wakes them.
 - **G4.7** Input & focus: `RiveControl` forwards pointer/keyboard/gamepad input into artboard space; Rive's FocusManager bridges to Godot's focus chain so Rive-authored UI participates in tab order and controller navigation.

@@ -11,6 +11,7 @@
 #include "rive/animation/state_machine_instance.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_boolean_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_color_runtime.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_enum_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_number_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_string_runtime.hpp"
@@ -83,6 +84,14 @@ static Variant read_vm_property(rive::ViewModelInstanceValueRuntime* value) {
                 static_cast<rive::ViewModelInstanceStringRuntime*>(value)
                     ->value()
                     .c_str());
+        case rive::DataType::enumType:
+            return String::utf8(
+                static_cast<rive::ViewModelInstanceEnumRuntime*>(value)
+                    ->value()
+                    .c_str());
+        case rive::DataType::trigger:
+            // Triggers carry no value; reported as fired.
+            return true;
         default:
             return Variant();
     }
@@ -599,10 +608,14 @@ void RiveRenderServer::rt_set_vm_string(int64_t p_instance_id,
     }
     (*found)->settled = false;
     (*found)->needs_render = true;
-    auto* property =
-        (*found)->view_model->propertyString(p_path.utf8().get_data());
-    if (property != nullptr) {
-        property->value(p_value.utf8().get_data());
+    const std::string path = p_path.utf8().get_data();
+    if (auto* str = (*found)->view_model->propertyString(path)) {
+        str->value(p_value.utf8().get_data());
+        return;
+    }
+    // Enums are string-valued from the Godot side.
+    if (auto* en = (*found)->view_model->propertyEnum(path)) {
+        en->value(p_value.utf8().get_data());
     }
 }
 
@@ -666,12 +679,25 @@ void RiveRenderServer::rt_watch_vm_property(int64_t p_instance_id,
         value = instance->view_model->propertyString(path);
     }
     if (value == nullptr) {
+        value = instance->view_model->propertyEnum(path);
+    }
+    bool is_trigger = false;
+    if (value == nullptr) {
+        value = instance->view_model->propertyTrigger(path);
+        is_trigger = value != nullptr;
+    }
+    if (value == nullptr) {
         ERR_PRINT("rivegd: cannot watch view-model property '" + p_path +
                   "' (not found or unsupported type)");
         return;
     }
     instance->watched.push_back({p_path, value});
 
+    if (is_trigger) {
+        // Triggers have no baseline value; they only report when fired.
+        value->clearChanges();
+        return;
+    }
     // Report the current value immediately so get_property has a baseline.
     Dictionary change;
     change["path"] = p_path;

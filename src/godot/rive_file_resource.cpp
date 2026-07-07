@@ -117,6 +117,13 @@ Array RiveFileResource::get_property_descriptions(
         Dictionary description;
         description["name"] = String::utf8(property.name.c_str());
         description["type"] = String::utf8(property.type.c_str());
+        if (!property.enum_values.empty()) {
+            PackedStringArray values;
+            for (const std::string& value : property.enum_values) {
+                values.push_back(String::utf8(value.c_str()));
+            }
+            description["enum_values"] = values;
+        }
         out.push_back(description);
     }
     return out;

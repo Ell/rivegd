@@ -156,6 +156,35 @@ func _process(_delta: float) -> void:
 					[vm_sprite.get_property("width")])
 			return
 		print("property changes: ", property_changes)
+		# Enum + trigger phase: artboard-2 has state.enum and trigger-prop.
+		vm_sprite.artboard = "artboard-2"
+		var enum_hint := ""
+		for property in vm_sprite.get_property_list():
+			if property["name"] == "data_binding/state":
+				enum_hint = property["hint_string"]
+		if not enum_hint.contains("state-green"):
+			fail("enum dropdown hint missing values (got '%s')" % enum_hint)
+			return
+		property_changes.clear()
+		vm_sprite.watch_property("state")
+		vm_sprite.watch_property("trigger-prop")
+		vm_sprite.set_property("state", "state-green")
+		vm_sprite.fire_property_trigger("trigger-prop")
+	elif frames == 420:
+		var saw_enum := false
+		var saw_trigger := false
+		for change in property_changes:
+			if change[0] == "state" and change[1] == "state-green":
+				saw_enum = true
+			if change[0] == "trigger-prop":
+				saw_trigger = true
+		if not saw_enum:
+			fail("enum change not observed (changes: %s)" % [property_changes])
+			return
+		if not saw_trigger:
+			fail("trigger fire not observed (changes: %s)" % [property_changes])
+			return
+		print("enum+trigger changes: ", property_changes)
 		print("API SMOKE OK")
 		get_tree().quit(0)
 
