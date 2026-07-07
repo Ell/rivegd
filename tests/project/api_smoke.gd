@@ -129,8 +129,32 @@ func _process(_delta: float) -> void:
 		if not control.file.is_valid():
 			fail("file invalid after hot reload")
 			return
+		_start_texture_phase()
+	elif frames == 280:
+		image_a = _screenshot()
+		_save(image_a, "api_smoke_texture_a.png")
+	elif frames == 320:
+		var image_b := _screenshot()
+		_save(image_b, "api_smoke_texture_b.png")
+		if image_a.get_data() == image_b.get_data():
+			fail("RiveTexture is not animating inside a TextureRect")
+			return
 		print("API SMOKE OK")
 		get_tree().quit(0)
+
+
+func _start_texture_phase() -> void:
+	control.queue_free()
+	control = null
+	# Rive as a plain Texture2D in a stock TextureRect: no Rive node at all.
+	var texture: RiveTexture = RiveTexture.new()
+	texture.file = load("res://fixtures/bullet_man.riv")
+	texture.render_size = Vector2i(400, 400)
+	var rect := TextureRect.new()
+	rect.texture = texture
+	rect.position = Vector2(32, 32)
+	rect.size = Vector2(400, 400)
+	add_child(rect)
 
 
 func _start_databind_phase() -> void:

@@ -69,18 +69,21 @@ void RiveSprite2D::set_file(const Ref<RiveFileResource>& p_file) {
         rive.file->connect("changed", reload);
     }
     recreate_instance();
+    update_configuration_warnings();
     notify_property_list_changed();
 }
 
 void RiveSprite2D::set_artboard(const String& p_artboard) {
     rive.artboard = p_artboard;
     recreate_instance();
+    update_configuration_warnings();
     notify_property_list_changed();
 }
 
 void RiveSprite2D::set_state_machine(const String& p_state_machine) {
     rive.state_machine = p_state_machine;
     recreate_instance();
+    update_configuration_warnings();
     notify_property_list_changed();
 }
 
@@ -126,6 +129,31 @@ void RiveSprite2D::recreate_instance() {
     rive.create(size);
     set_process(playing && rive.is_live());
     queue_redraw();
+}
+
+PackedStringArray RiveSprite2D::_get_configuration_warnings() const {
+    PackedStringArray warnings;
+    if (rive.file.is_null()) {
+        warnings.push_back("Assign a RiveFileResource (.riv) to play.");
+        return warnings;
+    }
+    if (!rive.file->is_valid()) {
+        warnings.push_back("The .riv file failed to load: " +
+                           rive.file->get_import_error());
+        return warnings;
+    }
+    if (!rive.artboard.is_empty() &&
+        !rive.file->get_artboard_names().has(rive.artboard)) {
+        warnings.push_back("Artboard \"" + rive.artboard +
+                           "\" does not exist in this file.");
+    }
+    if (!rive.state_machine.is_empty() &&
+        !rive.file->get_state_machine_names(rive.artboard)
+                 .has(rive.state_machine)) {
+        warnings.push_back("State machine \"" + rive.state_machine +
+                           "\" does not exist on this artboard.");
+    }
+    return warnings;
 }
 
 void RiveSprite2D::_notification(int p_what) {

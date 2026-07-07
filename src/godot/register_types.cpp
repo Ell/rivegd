@@ -6,6 +6,7 @@
 #include "godot/rive_file_resource.h"
 #include "godot/rive_render_server.h"
 #include "godot/rive_sprite_2d.h"
+#include "godot/rive_texture.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/classes/editor_plugin_registration.hpp>
@@ -32,6 +33,7 @@ void initialize_rivegd_module(ModuleInitializationLevel p_level) {
     GDREGISTER_INTERNAL_CLASS(rivegd::RiveRenderServer);
     GDREGISTER_CLASS(rivegd::RiveSprite2D);
     GDREGISTER_CLASS(rivegd::RiveControl);
+    GDREGISTER_CLASS(rivegd::RiveTexture);
     rivegd::RiveRenderServer::create_singleton();
 
     riv_loader.instantiate();

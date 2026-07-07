@@ -2,21 +2,21 @@
 
 #include "godot/rive_instance.h"
 
-#include <godot_cpp/classes/control.hpp>
-#include <godot_cpp/classes/input_event.hpp>
+#include <godot_cpp/classes/texture2drd.hpp>
 
 namespace rivegd {
 
-// UI node that plays a Rive artboard inside a Control rect and forwards
-// pointer input to the state machine, so Rive listeners (hover/click/drag)
-// work with zero code (GOALS G4.1/G4.7).
-//
-// The render texture tracks the control's size; resizes are debounced so a
-// live drag doesn't re-import the file every frame.
-class RiveControl : public godot::Control {
-    GDCLASS(RiveControl, godot::Control)
+// Rive output as a plain Texture2D (GOALS G4.1): usable in any material,
+// TextureRect, 3D surface, particle, or shader uniform. Advances itself via
+// RenderingServer's frame_pre_draw signal, so it animates anywhere it is
+// drawn — no scene-tree node required.
+class RiveTexture : public godot::Texture2DRD {
+    GDCLASS(RiveTexture, godot::Texture2DRD)
 
 public:
+    RiveTexture();
+    ~RiveTexture() override;
+
     void set_file(const godot::Ref<RiveFileResource>& p_file);
     godot::Ref<RiveFileResource> get_file() const { return rive.file; }
 
@@ -25,6 +25,9 @@ public:
 
     void set_state_machine(const godot::String& p_state_machine);
     godot::String get_state_machine() const { return rive.state_machine; }
+
+    void set_render_size(const godot::Vector2i& p_size);
+    godot::Vector2i get_render_size() const { return render_size; }
 
     void set_playing(bool p_playing);
     bool is_playing() const { return playing; }
@@ -35,18 +38,9 @@ public:
     void set_bool_input(const godot::String& p_name, bool p_value);
     void set_number_input(const godot::String& p_name, double p_value);
     void fire_trigger(const godot::String& p_name);
-
     void set_property(const godot::String& p_path, const godot::Variant& p_value);
     void fire_property_trigger(const godot::String& p_path);
 
-    godot::Vector2 _get_minimum_size() const override;
-    void _gui_input(const godot::Ref<godot::InputEvent>& p_event) override;
-
-    godot::PackedStringArray _get_configuration_warnings() const override;
-    void _notification(int p_what);
-    bool _set(const godot::StringName& p_name, const godot::Variant& p_value);
-    bool _get(const godot::StringName& p_name, godot::Variant& r_value) const;
-    void _get_property_list(godot::List<godot::PropertyInfo>* p_list) const;
     void _validate_property(godot::PropertyInfo& p_property) const;
 
 protected:
@@ -54,17 +48,14 @@ protected:
 
 private:
     void recreate_instance();
-    godot::Vector2i texture_size() const;
+    void on_frame_pre_draw();
 
     RiveInstance rive;
+    godot::Vector2i render_size = godot::Vector2i(512, 512);
     bool playing = true;
     double speed_scale = 1.0;
-
-    // Resize debounce: recreate the texture only after the size has been
-    // stable for this long.
-    static constexpr double kResizeDebounceSeconds = 0.3;
-    double resize_cooldown = 0.0;
-    godot::Vector2i live_texture_size;
+    uint64_t last_frame_usec = 0;
+    bool frame_hook_connected = false;
 };
 
 } // namespace rivegd
