@@ -23,7 +23,8 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends clang ninja-build scons
+          # uuid-dev: premake's bootstrap compiles against uuid/uuid.h.
+          sudo apt-get install -y --no-install-recommends clang ninja-build scons uuid-dev
 
       - name: Cache rive stage-1 build
         uses: actions/cache@v4

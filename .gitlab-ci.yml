@@ -1,0 +1,54 @@
+# GitLab CI — mirrors .github/workflows/ci.yml (lint + Linux build/test).
+# Runs on shared runners with the ubuntu:24.04 image.
+
+stages:
+  - lint
+  - build
+
+variables:
+  DEBIAN_FRONTEND: noninteractive
+  GIT_SUBMODULE_STRATEGY: recursive
+  GODOT_VERSION: "4.7"
+
+lint:
+  stage: lint
+  image: ubuntu:24.04
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+  script:
+    - tools/check_layering.sh
+
+linux:
+  stage: build
+  image: ubuntu:24.04
+  cache:
+    key: rive-linux-$CI_COMMIT_REF_SLUG
+    paths:
+      - thirdparty/rive-runtime/renderer/out/
+  before_script:
+    # clang: rive's build supports clang/msvc only. build-essential: g++ for
+    # the unit-test compile and GNU ld for the SCons link.
+    - apt-get update
+    # uuid-dev: premake's bootstrap compiles against uuid/uuid.h.
+    - apt-get install -y --no-install-recommends
+      build-essential clang ninja-build scons git curl unzip ca-certificates
+      uuid-dev
+  script:
+    # Stage 1: rive static libs (premake self-bootstraps; fetches pinned deps).
+    - tools/build_rive.sh release
+    # Tier 0 unit tests + layering.
+    - tools/test.sh all
+    # Stage 2: the GDExtension.
+    - scons -j$(nproc)
+    # Godot headless smoke. --import aborts at exit for any class-registering
+    # GDExtension on Godot 4.7 headless (upstream bug, repro in
+    # tests/upstream/godot-headless-import-crash/) — import completes first,
+    # so best-effort is safe; the --script run is the real gate.
+    - curl -sfLO https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+    - unzip -q Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+    - ./Godot_v${GODOT_VERSION}-stable_linux.x86_64 --headless --path tests/project --import || true
+    - ./Godot_v${GODOT_VERSION}-stable_linux.x86_64 --headless --path tests/project --script smoke.gd
+  artifacts:
+    paths:
+      - addons/rive/bin/
+    expire_in: 2 weeks
