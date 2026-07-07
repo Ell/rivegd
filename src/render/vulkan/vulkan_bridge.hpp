@@ -9,6 +9,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include "render/render_bridge.hpp"
+
 #include "rive/renderer/render_context.hpp"
 #include "rive/renderer/vulkan/render_context_vulkan_impl.hpp"
 #include "rive/renderer/vulkan/render_target_vulkan.hpp"
@@ -31,25 +33,25 @@ struct GodotVulkanHandles {
 //
 // Threading: create() and all frame methods must run on the thread that owns
 // the queue (Godot's render thread).
-class VulkanBridge {
+class VulkanBridge final : public RenderBridge {
 public:
     static std::unique_ptr<VulkanBridge> create(const GodotVulkanHandles& handles,
                                                 std::string* out_error);
-    ~VulkanBridge();
+    ~VulkanBridge() override;
 
-    rive::gpu::RenderContext* render_context() const { return m_context.get(); }
-    // RenderContext doubles as the rive::Factory that must import files
-    // whose GPU resources this context owns.
-    rive::Factory* factory() const { return m_context.get(); }
+    rive::gpu::RenderContext* render_context() const override {
+        return m_context.get();
+    }
 
     // Wraps an externally created image (e.g. Godot RD texture) as a Rive
     // render target. The image must be RGBA8_UNORM with usage flags
     // matching `usage_flags` and remain alive as long as the target.
-    rive::rcp<rive::gpu::RenderTargetVulkanImpl> wrap_render_target(
+    // native_handle_a = VkImage, native_handle_b = VkImageView.
+    rive::rcp<rive::gpu::RenderTarget> wrap_render_target(
         uint32_t width,
         uint32_t height,
-        uint64_t vk_image,
-        uint64_t vk_image_view);
+        uint64_t native_handle_a,
+        uint64_t native_handle_b) override;
 
     static constexpr VkFormat kTargetFormat = VK_FORMAT_R8G8B8A8_UNORM;
     static constexpr VkImageUsageFlags kTargetUsageFlags =
@@ -58,16 +60,17 @@ public:
         VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     // Frame sequence: begin_frame() -> draw with a RiveRenderer -> flush_to().
-    void begin_frame(uint32_t width, uint32_t height, uint32_t clear_color_argb);
+    void begin_frame(uint32_t width, uint32_t height,
+                     uint32_t clear_color_argb) override;
 
     // Records this frame's draws into a command buffer, transitions the
     // target to SHADER_READ_ONLY_OPTIMAL (so Godot can sample it), and
     // submits on Godot's queue. Returns false on device error.
-    bool flush_to(rive::gpu::RenderTargetVulkanImpl* target,
-                  std::string* out_error);
+    bool flush_to(rive::gpu::RenderTarget* target,
+                  std::string* out_error) override;
 
     // Blocks until all in-flight flushes complete (teardown path).
-    void wait_idle();
+    void wait_idle() override;
 
 private:
     VulkanBridge() = default;

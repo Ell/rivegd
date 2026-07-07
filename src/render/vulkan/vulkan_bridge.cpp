@@ -163,11 +163,13 @@ VulkanBridge::~VulkanBridge() {
     }
 }
 
-rive::rcp<rive::gpu::RenderTargetVulkanImpl> VulkanBridge::wrap_render_target(
+rive::rcp<rive::gpu::RenderTarget> VulkanBridge::wrap_render_target(
     uint32_t width,
     uint32_t height,
-    uint64_t vk_image,
-    uint64_t vk_image_view) {
+    uint64_t native_handle_a,
+    uint64_t native_handle_b) {
+    const uint64_t vk_image = native_handle_a;
+    const uint64_t vk_image_view = native_handle_b;
     auto* impl =
         m_context->static_impl_cast<rive::gpu::RenderContextVulkanImpl>();
     rive::rcp<rive::gpu::RenderTargetVulkanImpl> target =
@@ -210,8 +212,11 @@ uint64_t VulkanBridge::update_safe_frame_number() {
     return m_safe_frame_number;
 }
 
-bool VulkanBridge::flush_to(rive::gpu::RenderTargetVulkanImpl* target,
+bool VulkanBridge::flush_to(rive::gpu::RenderTarget* target_base,
                             std::string* out_error) {
+    // Targets handed to this bridge were created by wrap_render_target.
+    auto* target =
+        static_cast<rive::gpu::RenderTargetVulkanImpl*>(target_base);
     auto fail = [&](const char* msg) {
         if (out_error != nullptr) {
             *out_error = msg;

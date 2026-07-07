@@ -23,6 +23,10 @@ void RiveControl::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_playing", "playing"),
                          &RiveControl::set_playing);
     ClassDB::bind_method(D_METHOD("is_playing"), &RiveControl::is_playing);
+    ClassDB::bind_method(D_METHOD("set_pause_when_hidden", "pause"),
+                         &RiveControl::set_pause_when_hidden);
+    ClassDB::bind_method(D_METHOD("get_pause_when_hidden"),
+                         &RiveControl::get_pause_when_hidden);
     ClassDB::bind_method(D_METHOD("set_speed_scale", "speed_scale"),
                          &RiveControl::set_speed_scale);
     ClassDB::bind_method(D_METHOD("get_speed_scale"),
@@ -51,6 +55,8 @@ void RiveControl::_bind_methods() {
                  "set_state_machine", "get_state_machine");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing"), "set_playing",
                  "is_playing");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "pause_when_hidden"),
+                 "set_pause_when_hidden", "get_pause_when_hidden");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "speed_scale",
                               PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"),
                  "set_speed_scale", "get_speed_scale");
@@ -99,6 +105,10 @@ void RiveControl::set_state_machine(const String& p_state_machine) {
 void RiveControl::set_playing(bool p_playing) {
     playing = p_playing;
     set_process(playing && rive.is_live());
+}
+
+void RiveControl::set_pause_when_hidden(bool p_pause) {
+    pause_when_hidden = p_pause;
 }
 
 void RiveControl::set_speed_scale(double p_speed_scale) {
@@ -225,6 +235,9 @@ void RiveControl::_notification(int p_what) {
                     recreate_instance();
                     break;
                 }
+            }
+            if (pause_when_hidden && !is_visible_in_tree()) {
+                break; // GOALS G4.6: hidden instances stop advancing
             }
             rive.frame(get_process_delta_time() * speed_scale);
             if (rive.update_texture_binding()) {

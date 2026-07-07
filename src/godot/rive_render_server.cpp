@@ -1,5 +1,6 @@
 #include "godot/rive_render_server.h"
 
+#include "render/render_bridge.hpp"
 #include "render/vulkan/vulkan_bridge.hpp"
 
 #include "rive/artboard.hpp"
@@ -44,10 +45,16 @@ struct RiveRenderServer::Instance {
     std::unique_ptr<rive::ArtboardInstance> artboard;
     std::unique_ptr<rive::StateMachineInstance> state_machine;
     rive::rcp<rive::ViewModelInstanceRuntime> view_model;
-    rive::rcp<rive::gpu::RenderTargetVulkanImpl> target;
+    rive::rcp<rive::gpu::RenderTarget> target;
     RID rd_texture;
     Vector2i size;
     bool valid = false;
+
+    // Sleep bookkeeping (GOALS G4.6): when the machine reports it settled
+    // and nothing external arrived, skip the GPU frame — the target keeps
+    // its last contents.
+    bool needs_render = true;
+    bool settled = false;
 
     struct WatchedProperty {
         String path;
@@ -302,7 +309,16 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
     Instance* instance = *found;
 
     if (instance->state_machine != nullptr) {
-        instance->state_machine->advanceAndApply(static_cast<float>(p_delta));
+        const bool advancing =
+            instance->state_machine->advanceAndApply(static_cast<float>(p_delta));
+        if (advancing) {
+            instance->settled = false;
+            instance->needs_render = true;
+        } else if (!instance->settled) {
+            // Render one final frame in the settled pose, then sleep.
+            instance->settled = true;
+            instance->needs_render = true;
+        }
 
         // Marshal reported events to the main-thread mailbox.
         const size_t event_count = instance->state_machine->reportedEventCount();
@@ -367,7 +383,10 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
             }
         }
     } else {
-        instance->artboard->advance(static_cast<float>(p_delta));
+        instance->needs_render =
+            instance->artboard->advance(static_cast<float>(p_delta)) ||
+            !instance->settled;
+        instance->settled = !instance->needs_render;
     }
 
     // Watched view-model properties -> property_changed signal.
@@ -387,6 +406,11 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
             mailbox.append_array(changes);
         }
     }
+
+    if (!instance->needs_render) {
+        return; // sleeping: settled machine, no external changes
+    }
+    instance->needs_render = false;
 
     bridge->begin_frame(instance->size.x, instance->size.y, 0x00000000);
 
@@ -412,6 +436,8 @@ void RiveRenderServer::rt_set_bool(int64_t p_instance_id,
     if (found == nullptr || (*found)->state_machine == nullptr) {
         return;
     }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
     rive::SMIBool* input =
         (*found)->state_machine->getBool(p_name.utf8().get_data());
     if (input != nullptr) {
@@ -425,6 +451,8 @@ void RiveRenderServer::rt_set_number(int64_t p_instance_id,
     if (found == nullptr || (*found)->state_machine == nullptr) {
         return;
     }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
     rive::SMINumber* input =
         (*found)->state_machine->getNumber(p_name.utf8().get_data());
     if (input != nullptr) {
@@ -438,6 +466,8 @@ void RiveRenderServer::rt_fire_trigger(int64_t p_instance_id,
     if (found == nullptr || (*found)->state_machine == nullptr) {
         return;
     }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
     rive::SMITrigger* input =
         (*found)->state_machine->getTrigger(p_name.utf8().get_data());
     if (input != nullptr) {
@@ -452,6 +482,8 @@ void RiveRenderServer::rt_pointer(int64_t p_instance_id, int p_phase,
     if (found == nullptr || (*found)->state_machine == nullptr) {
         return;
     }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
     Instance* instance = *found;
 
     // Node-local pixels -> texture pixels -> artboard coordinates (inverse
@@ -488,6 +520,8 @@ void RiveRenderServer::rt_set_vm_bool(int64_t p_instance_id,
     if (found == nullptr || (*found)->view_model == nullptr) {
         return;
     }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
     auto* property =
         (*found)->view_model->propertyBoolean(p_path.utf8().get_data());
     if (property != nullptr) {
@@ -501,6 +535,8 @@ void RiveRenderServer::rt_set_vm_number(int64_t p_instance_id,
     if (found == nullptr || (*found)->view_model == nullptr) {
         return;
     }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
     auto* property =
         (*found)->view_model->propertyNumber(p_path.utf8().get_data());
     if (property != nullptr) {
@@ -515,6 +551,8 @@ void RiveRenderServer::rt_set_vm_string(int64_t p_instance_id,
     if (found == nullptr || (*found)->view_model == nullptr) {
         return;
     }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
     auto* property =
         (*found)->view_model->propertyString(p_path.utf8().get_data());
     if (property != nullptr) {
@@ -529,6 +567,8 @@ void RiveRenderServer::rt_set_vm_color(int64_t p_instance_id,
     if (found == nullptr || (*found)->view_model == nullptr) {
         return;
     }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
     auto* property =
         (*found)->view_model->propertyColor(p_path.utf8().get_data());
     if (property != nullptr) {
@@ -543,6 +583,8 @@ void RiveRenderServer::rt_fire_vm_trigger(int64_t p_instance_id,
     if (found == nullptr || (*found)->view_model == nullptr) {
         return;
     }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
     auto* property =
         (*found)->view_model->propertyTrigger(p_path.utf8().get_data());
     if (property != nullptr) {

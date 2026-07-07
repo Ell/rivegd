@@ -21,6 +21,10 @@ void RiveSprite2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_playing", "playing"),
                          &RiveSprite2D::set_playing);
     ClassDB::bind_method(D_METHOD("is_playing"), &RiveSprite2D::is_playing);
+    ClassDB::bind_method(D_METHOD("set_pause_when_hidden", "pause"),
+                         &RiveSprite2D::set_pause_when_hidden);
+    ClassDB::bind_method(D_METHOD("get_pause_when_hidden"),
+                         &RiveSprite2D::get_pause_when_hidden);
     ClassDB::bind_method(D_METHOD("set_speed_scale", "speed_scale"),
                          &RiveSprite2D::set_speed_scale);
     ClassDB::bind_method(D_METHOD("get_speed_scale"),
@@ -51,6 +55,8 @@ void RiveSprite2D::_bind_methods() {
                  "get_size");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing"), "set_playing",
                  "is_playing");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "pause_when_hidden"),
+                 "set_pause_when_hidden", "get_pause_when_hidden");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "speed_scale",
                               PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"),
                  "set_speed_scale", "get_speed_scale");
@@ -102,6 +108,10 @@ void RiveSprite2D::set_size(const Vector2i& p_size) {
 void RiveSprite2D::set_playing(bool p_playing) {
     playing = p_playing;
     set_process(playing && rive.is_live());
+}
+
+void RiveSprite2D::set_pause_when_hidden(bool p_pause) {
+    pause_when_hidden = p_pause;
 }
 
 void RiveSprite2D::set_speed_scale(double p_speed_scale) {
@@ -181,6 +191,9 @@ void RiveSprite2D::_notification(int p_what) {
             set_process(false);
         } break;
         case NOTIFICATION_PROCESS: {
+            if (pause_when_hidden && !is_visible_in_tree()) {
+                break; // GOALS G4.6: hidden instances stop advancing
+            }
             rive.frame(get_process_delta_time() * speed_scale);
             if (rive.update_texture_binding()) {
                 queue_redraw();

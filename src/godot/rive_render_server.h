@@ -17,7 +17,7 @@ template <typename T> class rcp;
 namespace rivegd {
 
 namespace render {
-class VulkanBridge;
+class RenderBridge;
 }
 
 // Render-thread owner of all live Rive GPU state.
@@ -102,7 +102,7 @@ private:
 
     static RiveRenderServer* singleton;
 
-    std::unique_ptr<render::VulkanBridge> bridge; // render thread only
+    std::unique_ptr<render::RenderBridge> bridge; // render thread only
     godot::HashMap<int64_t, Instance*> instances; // render thread only
     bool bridge_failed = false;                   // render thread only
 

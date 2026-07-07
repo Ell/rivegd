@@ -119,6 +119,9 @@ re-applied by name.
   (`Engine.time_scale` also applies, since deltas are process deltas).
 - Pause is Godot-standard: a paused tree pauses Rive; use
   `process_mode = PROCESS_MODE_ALWAYS` for pause menus that keep animating.
+- **Efficiency defaults**: hidden nodes stop advancing (`pause_when_hidden`,
+  default on), and a settled state machine sleeps — GPU work stops until any
+  input, pointer event, or property write wakes it. Both are automatic.
 
 ## Building from source
 

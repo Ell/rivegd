@@ -29,6 +29,9 @@ public:
     void set_playing(bool p_playing);
     bool is_playing() const { return playing; }
 
+    void set_pause_when_hidden(bool p_pause);
+    bool get_pause_when_hidden() const { return pause_when_hidden; }
+
     void set_speed_scale(double p_speed_scale);
     double get_speed_scale() const { return speed_scale; }
 
@@ -60,6 +63,7 @@ private:
 
     RiveInstance rive;
     bool playing = true;
+    bool pause_when_hidden = true;
     double speed_scale = 1.0;
 
     // Resize debounce: recreate the texture only after the size has been
