@@ -9,6 +9,7 @@ using namespace godot;
 namespace rivegd {
 
 static const char* kInputPrefix = "inputs/";
+static const char* kPropertyPrefix = "data_binding/";
 
 void RiveInstance::create(const Vector2i& p_size) {
     release();
@@ -259,10 +260,41 @@ void RiveInstance::get_property_list(List<PropertyInfo>* p_list) const {
         // Triggers are actions, not values; they stay script-only until the
         // editor inspector plugin adds fire buttons (Phase 2b).
     }
+
+    Array vm_properties = file->get_property_descriptions(artboard);
+    bool group_added = false;
+    for (int i = 0; i < vm_properties.size(); ++i) {
+        Dictionary description = vm_properties[i];
+        const String type = description["type"];
+        Variant::Type variant_type = Variant::NIL;
+        if (type == "number") {
+            variant_type = Variant::FLOAT;
+        } else if (type == "boolean") {
+            variant_type = Variant::BOOL;
+        } else if (type == "string") {
+            variant_type = Variant::STRING;
+        } else if (type == "color") {
+            variant_type = Variant::COLOR;
+        } else {
+            continue; // triggers/enums/nested: script-only for now
+        }
+        if (!group_added) {
+            p_list->push_back(PropertyInfo(Variant::NIL, "Data Binding",
+                                           PROPERTY_HINT_NONE, kPropertyPrefix,
+                                           PROPERTY_USAGE_GROUP));
+            group_added = true;
+        }
+        p_list->push_back(PropertyInfo(
+            variant_type, String(kPropertyPrefix) + String(description["name"])));
+    }
 }
 
 bool RiveInstance::try_set(const StringName& p_name, const Variant& p_value) {
     const String name = p_name;
+    if (name.begins_with(kPropertyPrefix)) {
+        set_property(name.trim_prefix(kPropertyPrefix), p_value);
+        return true;
+    }
     if (!name.begins_with(kInputPrefix)) {
         return false;
     }
@@ -277,6 +309,10 @@ bool RiveInstance::try_set(const StringName& p_name, const Variant& p_value) {
 
 bool RiveInstance::try_get(const StringName& p_name, Variant& r_value) const {
     const String name = p_name;
+    if (name.begins_with(kPropertyPrefix)) {
+        r_value = get_property(name.trim_prefix(kPropertyPrefix));
+        return true;
+    }
     if (!name.begins_with(kInputPrefix)) {
         return false;
     }

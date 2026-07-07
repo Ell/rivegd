@@ -36,6 +36,7 @@ public:
     godot::Array get_input_descriptions(
         const godot::String& p_artboard,
         const godot::String& p_state_machine) const;
+    godot::Array get_property_descriptions(const godot::String& p_artboard) const;
     godot::Vector2 get_artboard_size(const godot::String& p_artboard) const;
 
 protected:

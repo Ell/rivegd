@@ -175,6 +175,13 @@ func _start_property_phase() -> void:
 	vm_sprite.property_changed.connect(func(path, value):
 		property_changes.push_back([path, value]))
 	vm_sprite.watch_property("width")
+	# VM properties surface as inspector properties too.
+	var has_db_property := false
+	for property in vm_sprite.get_property_list():
+		if property["name"] == "data_binding/width":
+			has_db_property = true
+	if not has_db_property:
+		fail("data_binding/width missing from property list")
 
 
 func _start_texture_phase() -> void:

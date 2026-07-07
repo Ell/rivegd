@@ -97,6 +97,31 @@ Array RiveFileResource::get_input_descriptions(
     return out;
 }
 
+// Array of { name: String, type: "number"|"string"|"boolean"|"color"|... }.
+Array RiveFileResource::get_property_descriptions(
+    const String& p_artboard) const {
+    Array out;
+    if (riv_file == nullptr) {
+        return out;
+    }
+    const core::ArtboardMeta* meta =
+        riv_file->find_artboard(p_artboard.utf8().get_data());
+    if (meta == nullptr && !riv_file->artboards().empty() &&
+        p_artboard.is_empty()) {
+        meta = &riv_file->artboards()[0];
+    }
+    if (meta == nullptr) {
+        return out;
+    }
+    for (const core::VmPropertyMeta& property : meta->view_model_properties) {
+        Dictionary description;
+        description["name"] = String::utf8(property.name.c_str());
+        description["type"] = String::utf8(property.type.c_str());
+        out.push_back(description);
+    }
+    return out;
+}
+
 Vector2 RiveFileResource::get_artboard_size(const String& p_artboard) const {
     if (riv_file == nullptr) {
         return Vector2();
@@ -143,6 +168,8 @@ void RiveFileResource::_bind_methods() {
         &RiveFileResource::get_input_descriptions);
     ClassDB::bind_method(D_METHOD("get_artboard_size", "artboard"),
                          &RiveFileResource::get_artboard_size);
+    ClassDB::bind_method(D_METHOD("get_property_descriptions", "artboard"),
+                         &RiveFileResource::get_property_descriptions);
 
     ADD_PROPERTY(PropertyInfo(Variant::PACKED_BYTE_ARRAY, "data",
                               PROPERTY_HINT_NONE, "",

@@ -3,6 +3,8 @@
 #include "rive/animation/state_machine_input_instance.hpp"
 #include "rive/animation/state_machine_instance.hpp"
 #include "rive/artboard.hpp"
+#include "rive/data_bind/data_values/data_type.hpp"
+#include "rive/viewmodel/runtime/viewmodel_runtime.hpp"
 #include "utils/no_op_factory.hpp"
 
 namespace rivegd::core {
@@ -90,6 +92,28 @@ std::unique_ptr<RivFile> RivFile::import(const uint8_t* data,
                 }
                 meta.state_machines.push_back(std::move(sm_meta));
             }
+            rive::ViewModelRuntime* view_model =
+                out->m_file->defaultArtboardViewModel(instance.get());
+            if (view_model != nullptr) {
+                for (const rive::PropertyData& property :
+                     view_model->properties()) {
+                    const char* type = nullptr;
+                    switch (property.type) {
+                        case rive::DataType::number:  type = "number";  break;
+                        case rive::DataType::string:  type = "string";  break;
+                        case rive::DataType::boolean: type = "boolean"; break;
+                        case rive::DataType::color:   type = "color";   break;
+                        case rive::DataType::trigger: type = "trigger"; break;
+                        case rive::DataType::enumType: type = "enum";   break;
+                        default: break; // nested VMs/lists: not yet exposed
+                    }
+                    if (type != nullptr) {
+                        meta.view_model_properties.push_back(
+                            {property.name, type});
+                    }
+                }
+            }
+
             const size_t anim_count = instance->animationCount();
             meta.animations.reserve(anim_count);
             for (size_t j = 0; j < anim_count; ++j) {

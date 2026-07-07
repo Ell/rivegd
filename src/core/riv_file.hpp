@@ -21,6 +21,11 @@ struct InputMeta {
     float default_number = 0.0f;
 };
 
+struct VmPropertyMeta {
+    std::string name;
+    std::string type; // "number" | "string" | "boolean" | "color" | "trigger" | "enum"
+};
+
 struct StateMachineMeta {
     std::string name;
     std::vector<InputMeta> inputs;
@@ -32,6 +37,8 @@ struct ArtboardMeta {
     float height = 0.0f;
     std::vector<StateMachineMeta> state_machines;
     std::vector<std::string> animations;
+    // Scalar properties of the artboard's default view model.
+    std::vector<VmPropertyMeta> view_model_properties;
 
     const StateMachineMeta* find_state_machine(const std::string& sm_name) const;
 };

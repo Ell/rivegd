@@ -69,7 +69,9 @@ create_tween().tween_property($Menu, "inputs/health", 1.0, 0.5)
 
 ### Data binding (view models)
 
-If the artboard has a default view model, it is bound automatically.
+If the artboard has a view model, it is bound automatically (its default
+instance when one is declared, a fresh instance otherwise). Top-level scalar
+properties also appear in the inspector under a **Data Binding** group.
 Properties are path-addressed and typed by the Variant you pass
 (bool / number / String / Color):
 

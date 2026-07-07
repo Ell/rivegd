@@ -92,6 +92,22 @@ TEST_CASE("light_switch.riv exposes its 'On' bool input in metadata") {
     REQUIRE(found_on);
 }
 
+TEST_CASE("data_binding_test.riv exposes view model properties in metadata") {
+    auto bytes = read_file(FIXTURE("data_binding_test.riv"));
+    auto file = rivegd::core::RivFile::import(bytes.data(), bytes.size());
+    REQUIRE(file != nullptr);
+
+    const auto* artboard = file->find_artboard("artboard-1");
+    REQUIRE(artboard != nullptr);
+    bool found_width = false;
+    for (const auto& property : artboard->view_model_properties) {
+        if (property.name == "width" && property.type == "number") {
+            found_width = true;
+        }
+    }
+    REQUIRE(found_width);
+}
+
 TEST_CASE("headless advance: instance a state machine and run it") {
     auto bytes = read_file(FIXTURE("bullet_man.riv"));
     auto file = rivegd::core::RivFile::import(bytes.data(), bytes.size());
