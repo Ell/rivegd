@@ -43,8 +43,8 @@ Design rationale and evidence live in [`docs/implementation-strategy.md`](docs/i
   | boolean | `bool` (set/get/watch/inspector) | ✅ |
   | string | `String` (set/get/watch/inspector) | ✅ |
   | color | `Color` (set/get/watch/inspector) | ✅ |
-  | trigger | `fire_property_trigger()` + watchable (signal when Rive fires it) | ⏳ fire only |
-  | enum | `String` value + inspector dropdown from the file's enum values | ⏳ |
+  | trigger | `fire_property_trigger()` + watchable (signal when fired) | ✅ |
+  | enum | `String` value + inspector dropdown from the file's enum values | ✅ |
   | nested viewModel | slash paths (`"a/b/c"`) into nested properties; instance swapping by name | ✅ paths / ⏳ swapping |
   | list | `Array`-like API: size/get/add/remove/swap of VM instances | ⏳ |
   | image | assign a Godot `Image`/`Texture2D` (decoded through the render context factory) | ⏳ |
