@@ -55,6 +55,12 @@ void RiveSprite2D::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("list_set_property", "path", "index", "sub_path", "value"),
         &RiveSprite2D::list_set_property);
+    ClassDB::bind_method(
+        D_METHOD("set_artboard_property", "path", "artboard_name"),
+        &RiveSprite2D::set_artboard_property);
+    ClassDB::bind_method(
+        D_METHOD("replace_view_model", "path", "view_model", "instance_name"),
+        &RiveSprite2D::replace_view_model, DEFVAL(String()));
 
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "file",
                               PROPERTY_HINT_RESOURCE_TYPE, "RiveFileResource"),
@@ -179,6 +185,16 @@ void RiveSprite2D::list_set_property(const String& p_path, int p_index,
                               const String& p_sub_path,
                               const Variant& p_value) {
     rive.list_set_property(p_path, p_index, p_sub_path, p_value);
+}
+
+void RiveSprite2D::set_artboard_property(const String& p_path,
+                                  const String& p_artboard_name) {
+    rive.set_artboard_property(p_path, p_artboard_name);
+}
+
+void RiveSprite2D::replace_view_model(const String& p_path, const String& p_view_model,
+                               const String& p_instance_name) {
+    rive.replace_view_model(p_path, p_view_model, p_instance_name);
 }
 
 void RiveSprite2D::recreate_instance() {

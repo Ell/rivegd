@@ -2,7 +2,9 @@
 
 #include "godot/rive_render_server.h"
 
+#include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
+#include <godot_cpp/classes/texture2d.hpp>
 
 using namespace godot;
 
@@ -123,6 +125,26 @@ void RiveInstance::post_property(const String& p_path, const Variant& p_value) {
                 callable_mp(server, &RiveRenderServer::rt_set_vm_color)
                     .bind(instance_id, p_path, Color(p_value)));
             break;
+        case Variant::OBJECT: {
+            // Image properties accept a Godot Image or Texture2D; encode to
+            // PNG here (main thread) and decode through the context factory
+            // on the render thread.
+            Ref<Image> image = p_value;
+            if (image.is_null()) {
+                Ref<Texture2D> texture = p_value;
+                if (texture.is_valid()) {
+                    image = texture->get_image();
+                }
+            }
+            if (image.is_null()) {
+                ERR_PRINT("rivegd: expected an Image or Texture2D for '" +
+                          p_path + "'");
+                return;
+            }
+            rs->call_on_render_thread(
+                callable_mp(server, &RiveRenderServer::rt_set_vm_image)
+                    .bind(instance_id, p_path, image->save_png_to_buffer()));
+        } break;
         default:
             ERR_PRINT("rivegd: unsupported view-model property type for '" +
                       p_path + "'");
@@ -204,6 +226,17 @@ void RiveInstance::list_set_property(const String& p_path, int p_index,
                                      const String& p_sub_path,
                                      const Variant& p_value) {
     RIVEGD_POST(rt_list_set, p_path, p_index, p_sub_path, p_value);
+}
+
+void RiveInstance::set_artboard_property(const String& p_path,
+                                         const String& p_artboard_name) {
+    RIVEGD_POST(rt_set_vm_artboard, p_path, p_artboard_name);
+}
+
+void RiveInstance::replace_view_model(const String& p_path,
+                                      const String& p_view_model,
+                                      const String& p_instance_name) {
+    RIVEGD_POST(rt_replace_view_model, p_path, p_view_model, p_instance_name);
 }
 
 void RiveInstance::fire_property_trigger(const String& p_path) {

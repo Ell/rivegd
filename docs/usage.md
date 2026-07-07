@@ -110,6 +110,14 @@ $HUD.list_clear("inventory")
 Structural list state lives on the render thread and does not survive
 instance rebuilds.
 
+Images, artboards, and nested instances:
+
+```gdscript
+$HUD.set_property("avatar", my_image_or_texture)      # image property
+$HUD.set_artboard_property("slot", "CoolWidget")      # bindable artboard by name
+$HUD.replace_view_model("child", "ChildVM", "variant-b")  # swap nested instance
+```
+
 ### Events & state changes
 
 Rive events surface as a signal with custom properties as a Dictionary;

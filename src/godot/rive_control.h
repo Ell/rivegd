@@ -52,6 +52,11 @@ public:
     void list_set_property(const godot::String& p_path, int p_index,
                            const godot::String& p_sub_path,
                            const godot::Variant& p_value);
+    void set_artboard_property(const godot::String& p_path,
+                               const godot::String& p_artboard_name);
+    void replace_view_model(const godot::String& p_path,
+                            const godot::String& p_view_model,
+                            const godot::String& p_instance_name);
 
     godot::Vector2 _get_minimum_size() const override;
     void _gui_input(const godot::Ref<godot::InputEvent>& p_event) override;

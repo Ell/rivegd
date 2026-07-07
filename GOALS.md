@@ -45,10 +45,10 @@ Design rationale and evidence live in [`docs/implementation-strategy.md`](docs/i
   | color | `Color` (set/get/watch/inspector) | ✅ |
   | trigger | `fire_property_trigger()` + watchable (signal when fired) | ✅ |
   | enum | `String` value + inspector dropdown from the file's enum values | ✅ |
-  | nested viewModel | slash paths (`"a/b/c"`) into nested properties; instance swapping by name | ✅ paths / ⏳ swapping |
+  | nested viewModel | slash paths (`"a/b/c"`) into nested properties; `replace_view_model` instance swapping | ✅ |
   | list | append/remove_at/swap/clear + per-item property writes; watchable size | ✅ (item reads pending) |
-  | image | assign a Godot `Image`/`Texture2D` (decoded through the render context factory) | ⏳ |
-  | artboard | assign bindable artboards by name | ⏳ |
+  | image | assign a Godot `Image`/`Texture2D` via `set_property` (PNG-encoded, decoded through the context factory) | ✅ API (no artboard-bound image fixture exists to verify visually) |
+  | artboard | `set_artboard_property(path, artboard_name)` | ✅ |
 
   Inspector exposure follows the same rule: if Rive can author it, it shows up (scalars as fields today; enums as dropdowns, triggers as buttons, lists/images via the inspector plugin).
 - **G4.5** Time is Godot time: `process_callback` (idle/physics/**manual** `advance(delta)`), `speed_scale`, `Engine.time_scale`, standard `process_mode` pause inheritance. Godot Timers/Tweens compose with no special casing.

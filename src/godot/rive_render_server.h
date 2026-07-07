@@ -95,6 +95,20 @@ public:
     void rt_watch_vm_property(int64_t p_instance_id,
                               const godot::String& p_path);
 
+    // Image property: p_png_bytes is an encoded image (PNG/JPEG/WebP),
+    // decoded on the render thread through the context factory.
+    void rt_set_vm_image(int64_t p_instance_id, const godot::String& p_path,
+                         const godot::PackedByteArray& p_png_bytes);
+    // Artboard property: binds the named artboard from the same file.
+    void rt_set_vm_artboard(int64_t p_instance_id, const godot::String& p_path,
+                            const godot::String& p_artboard_name);
+    // Replaces a nested view model instance (empty instance name = fresh
+    // instance of the named view model).
+    void rt_replace_view_model(int64_t p_instance_id,
+                               const godot::String& p_path,
+                               const godot::String& p_view_model,
+                               const godot::String& p_instance_name);
+
     // List properties (path-addressed; items are view-model instances).
     // List state lives on the render thread and does not survive instance
     // rebuilds (no replay for structural ops).

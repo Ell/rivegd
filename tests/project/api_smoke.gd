@@ -203,8 +203,35 @@ func _process(_delta: float) -> void:
 					[vm_sprite.get_property("Test List")])
 			return
 		print("list size after ops: ", vm_sprite.get_property("Test List"))
+		_start_artboard_phase()
+	elif frames == 540:
+		image_a = _screenshot()
+		_save(image_a, "api_smoke_artboard_ch1.png")
+		# Swap the bound artboard; pixels must change.
+		vm_sprite.set_artboard_property("ab", "ch2")
+		# Image writes to unknown paths must be safe (no bound image fixture
+		# is available; the decode path is API-covered).
+		vm_sprite.set_property("nonexistent_image", Image.create_empty(
+				4, 4, false, Image.FORMAT_RGBA8))
+	elif frames == 580:
+		var image_b := _screenshot()
+		_save(image_b, "api_smoke_artboard_ch2.png")
+		if image_a.get_data() == image_b.get_data():
+			fail("pixels did not change after set_artboard_property ch1->ch2")
+			return
 		print("API SMOKE OK")
 		get_tree().quit(0)
+
+
+func _start_artboard_phase() -> void:
+	vm_sprite.queue_free()
+	vm_sprite = RiveSprite2D.new()
+	vm_sprite.file = load("res://fixtures/data_binding_artboards_test.riv")
+	vm_sprite.artboard = "main"
+	vm_sprite.position = Vector2(32, 32)
+	vm_sprite.size = Vector2i(400, 400)
+	add_child(vm_sprite)
+	vm_sprite.set_artboard_property("ab", "ch1")
 
 
 func _start_list_phase() -> void:

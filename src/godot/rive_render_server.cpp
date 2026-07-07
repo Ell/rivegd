@@ -12,6 +12,8 @@
 #include "rive/viewmodel/runtime/viewmodel_instance_boolean_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_color_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_enum_runtime.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_artboard_runtime.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_asset_image_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_list_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_number_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_runtime.hpp"
@@ -63,6 +65,10 @@ struct RiveRenderServer::Instance {
     // its last contents.
     bool needs_render = true;
     bool settled = false;
+
+    // Decoded RenderImages assigned to image properties (kept alive here;
+    // keyed by path so reassignment releases the old one).
+    godot::HashMap<godot::String, rive::rcp<rive::RenderImage>> bound_images;
 
     struct WatchedProperty {
         String path;
@@ -760,6 +766,91 @@ void RiveRenderServer::rt_watch_vm_property(int64_t p_instance_id,
     change["value"] = read_vm_property(value);
     std::lock_guard<std::mutex> lock(mailbox_mutex);
     property_mailbox[p_instance_id].push_back(change);
+}
+
+void RiveRenderServer::rt_set_vm_image(int64_t p_instance_id,
+                                       const String& p_path,
+                                       const PackedByteArray& p_png_bytes) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->view_model == nullptr ||
+        bridge == nullptr) {
+        return;
+    }
+    Instance* instance = *found;
+    instance->settled = false;
+    instance->needs_render = true;
+    auto* property =
+        instance->view_model->propertyImage(p_path.utf8().get_data());
+    if (property == nullptr) {
+        ERR_PRINT("rivegd: image property not found: " + p_path);
+        return;
+    }
+    rive::rcp<rive::RenderImage> image = bridge->factory()->decodeImage(
+        rive::Span<const uint8_t>(p_png_bytes.ptr(), p_png_bytes.size()));
+    if (image == nullptr) {
+        ERR_PRINT("rivegd: could not decode image for '" + p_path + "'");
+        return;
+    }
+    property->value(image.get());
+    instance->bound_images[p_path] = image;
+}
+
+void RiveRenderServer::rt_set_vm_artboard(int64_t p_instance_id,
+                                          const String& p_path,
+                                          const String& p_artboard_name) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->view_model == nullptr) {
+        return;
+    }
+    Instance* instance = *found;
+    instance->settled = false;
+    instance->needs_render = true;
+    auto* property =
+        instance->view_model->propertyArtboard(p_path.utf8().get_data());
+    if (property == nullptr) {
+        ERR_PRINT("rivegd: artboard property not found: " + p_path);
+        return;
+    }
+    rive::rcp<rive::BindableArtboard> bindable =
+        p_artboard_name.is_empty()
+            ? instance->file->bindableArtboardDefault()
+            : instance->file->bindableArtboardNamed(
+                  p_artboard_name.utf8().get_data());
+    if (bindable == nullptr) {
+        ERR_PRINT("rivegd: bindable artboard not found: " + p_artboard_name);
+        return;
+    }
+    property->value(bindable);
+}
+
+void RiveRenderServer::rt_replace_view_model(int64_t p_instance_id,
+                                             const String& p_path,
+                                             const String& p_view_model,
+                                             const String& p_instance_name) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->view_model == nullptr) {
+        return;
+    }
+    Instance* instance = *found;
+    instance->settled = false;
+    instance->needs_render = true;
+    rive::ViewModelRuntime* view_model =
+        instance->file->viewModelByName(p_view_model.utf8().get_data());
+    if (view_model == nullptr) {
+        ERR_PRINT("rivegd: view model not found: " + p_view_model);
+        return;
+    }
+    rive::rcp<rive::ViewModelInstanceRuntime> replacement =
+        p_instance_name.is_empty()
+            ? view_model->createInstance()
+            : view_model->createInstanceFromName(
+                  p_instance_name.utf8().get_data());
+    if (replacement == nullptr ||
+        !instance->view_model->replaceViewModel(p_path.utf8().get_data(),
+                                                replacement.get())) {
+        ERR_PRINT("rivegd: could not replace nested view model at '" + p_path +
+                  "'");
+    }
 }
 
 void RiveRenderServer::rt_list_append(int64_t p_instance_id,
