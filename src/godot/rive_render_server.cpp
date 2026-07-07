@@ -31,6 +31,7 @@
 #include "rive/custom_property_string.hpp"
 #include "rive/event.hpp"
 #include "rive/event_report.hpp"
+#include "rive/input/focus_manager.hpp"
 #include "rive/file.hpp"
 #include "rive/math/mat2d.hpp"
 #include "rive/renderer/rive_renderer.hpp"
@@ -839,6 +840,56 @@ void RiveRenderServer::rt_watch_vm_property(int64_t p_instance_id,
     change["value"] = read_vm_property(value);
     std::lock_guard<std::mutex> lock(mailbox_mutex);
     property_mailbox[p_instance_id].push_back(change);
+}
+
+void RiveRenderServer::rt_key(int64_t p_instance_id, int p_rive_key,
+                              int p_modifiers, bool p_pressed,
+                              bool p_repeat) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->state_machine == nullptr) {
+        return;
+    }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
+    rive::FocusManager* focus = (*found)->state_machine->focusManager();
+    if (focus != nullptr) {
+        focus->keyInput(static_cast<rive::Key>(p_rive_key),
+                        static_cast<rive::KeyModifiers>(p_modifiers),
+                        p_pressed, p_repeat);
+    }
+}
+
+void RiveRenderServer::rt_text_input(int64_t p_instance_id,
+                                     const String& p_text) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->state_machine == nullptr) {
+        return;
+    }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
+    rive::FocusManager* focus = (*found)->state_machine->focusManager();
+    if (focus != nullptr) {
+        focus->textInput(p_text.utf8().get_data());
+    }
+}
+
+void RiveRenderServer::rt_focus_move(int64_t p_instance_id, int p_direction) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->state_machine == nullptr) {
+        return;
+    }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
+    rive::StateMachineInstance* sm = (*found)->state_machine.get();
+    rive::FocusManager* focus = sm->focusManager();
+    switch (p_direction) {
+        case 0: sm->focusNext(); break;
+        case 1: sm->focusPrevious(); break;
+        case 2: if (focus) focus->focusLeft(); break;
+        case 3: if (focus) focus->focusRight(); break;
+        case 4: if (focus) focus->focusUp(); break;
+        case 5: if (focus) focus->focusDown(); break;
+    }
 }
 
 void RiveRenderServer::rt_set_vm_image(int64_t p_instance_id,

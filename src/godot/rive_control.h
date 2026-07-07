@@ -58,6 +58,10 @@ public:
                             const godot::String& p_view_model,
                             const godot::String& p_instance_name);
 
+    void focus_next_element();
+    void focus_previous_element();
+    void send_text_input(const godot::String& p_text);
+
     godot::Vector2 _get_minimum_size() const override;
     void _gui_input(const godot::Ref<godot::InputEvent>& p_event) override;
 

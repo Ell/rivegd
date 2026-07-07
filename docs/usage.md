@@ -132,6 +132,22 @@ $Menu.state_changed.connect(func(state_name: String):
     print("entered state: ", state_name))
 ```
 
+### Keyboard & focus
+
+`RiveControl` forwards key events (GLFW-mapped) and printable text to Rive's
+focus system when focused — Rive keyboard listeners and text fields work.
+Focus inside the artboard is steppable from script:
+
+```gdscript
+$Menu.focus_mode = Control.FOCUS_ALL
+$Menu.focus_next_element()      # walk Rive's internal tab order
+$Menu.focus_previous_element()
+$Menu.send_text_input("hello")  # programmatic text entry
+```
+
+Bridging Rive's focus edge into Godot's own focus chain (yielding to the
+next Control) is on the roadmap (GOALS G4.7).
+
 ### Hot reload
 
 Nodes rebuild automatically whenever their `RiveFileResource` changes —

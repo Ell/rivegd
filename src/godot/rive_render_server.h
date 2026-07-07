@@ -98,6 +98,14 @@ public:
     void rt_watch_vm_property(int64_t p_instance_id,
                               const godot::String& p_path);
 
+    // Keyboard/focus input (GOALS G4.7). Key codes use rive's GLFW-style
+    // values; RiveControl maps Godot keycodes before posting.
+    void rt_key(int64_t p_instance_id, int p_rive_key, int p_modifiers,
+                bool p_pressed, bool p_repeat);
+    void rt_text_input(int64_t p_instance_id, const godot::String& p_text);
+    // 0 = next, 1 = previous, 2 = left, 3 = right, 4 = up, 5 = down.
+    void rt_focus_move(int64_t p_instance_id, int p_direction);
+
     // Image property: p_png_bytes is an encoded image (PNG/JPEG/WebP),
     // decoded on the render thread through the context factory.
     void rt_set_vm_image(int64_t p_instance_id, const godot::String& p_path,

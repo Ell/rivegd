@@ -205,6 +205,19 @@ Array RiveInstance::take_property_changes() {
                 .bind(instance_id, __VA_ARGS__));                              \
     } while (0)
 
+void RiveInstance::key(int p_rive_key, int p_modifiers, bool p_pressed,
+                       bool p_repeat) {
+    RIVEGD_POST(rt_key, p_rive_key, p_modifiers, p_pressed, p_repeat);
+}
+
+void RiveInstance::text_input(const String& p_text) {
+    RIVEGD_POST(rt_text_input, p_text);
+}
+
+void RiveInstance::focus_move(int p_direction) {
+    RIVEGD_POST(rt_focus_move, p_direction);
+}
+
 void RiveInstance::list_append(const String& p_path, const String& p_view_model,
                                const String& p_instance_name) {
     RIVEGD_POST(rt_list_append, p_path, p_view_model, p_instance_name);

@@ -219,8 +219,42 @@ func _process(_delta: float) -> void:
 		if image_a.get_data() == image_b.get_data():
 			fail("pixels did not change after set_artboard_property ch1->ch2")
 			return
+		_start_keyboard_phase()
+	elif frames == 620:
+		image_a = _screenshot()
+		_save(image_a, "api_smoke_keyboard_focused.png")
+		# Space keyup on the focused element (mirrors rive's focus_test).
+		var down := InputEventKey.new()
+		down.keycode = KEY_SPACE
+		down.pressed = true
+		key_control.grab_focus()
+		key_control._gui_input(down)
+		var up := down.duplicate()
+		up.pressed = false
+		key_control._gui_input(up)
+	elif frames == 660:
+		var image_b := _screenshot()
+		_save(image_b, "api_smoke_keyboard_space.png")
+		if image_a.get_data() == image_b.get_data():
+			fail("pixels did not change after space key on focused element")
+			return
 		print("API SMOKE OK")
 		get_tree().quit(0)
+
+
+var key_control: RiveControl
+
+
+func _start_keyboard_phase() -> void:
+	vm_sprite.queue_free()
+	key_control = RiveControl.new()
+	key_control.file = load("res://fixtures/keyboard_listener.riv")
+	key_control.position = Vector2(32, 32)
+	key_control.size = Vector2(400, 400)
+	key_control.focus_mode = Control.FOCUS_ALL
+	add_child(key_control)
+	# Focus a keyboard-listening element (child index 5, as in rive's test).
+	key_control.focus_previous_element()
 
 
 func _start_artboard_phase() -> void:

@@ -2,6 +2,7 @@
 
 #include "godot/rive_render_server.h"
 
+#include <godot_cpp/classes/input_event_key.hpp>
 #include <godot_cpp/classes/input_event_mouse_button.hpp>
 #include <godot_cpp/classes/input_event_mouse_motion.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
@@ -60,6 +61,12 @@ void RiveControl::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("set_artboard_property", "path", "artboard_name"),
         &RiveControl::set_artboard_property);
+    ClassDB::bind_method(D_METHOD("focus_next_element"),
+                         &RiveControl::focus_next_element);
+    ClassDB::bind_method(D_METHOD("focus_previous_element"),
+                         &RiveControl::focus_previous_element);
+    ClassDB::bind_method(D_METHOD("send_text_input", "text"),
+                         &RiveControl::send_text_input);
     ClassDB::bind_method(
         D_METHOD("replace_view_model", "path", "view_model", "instance_name"),
         &RiveControl::replace_view_model, DEFVAL(String()));
@@ -194,6 +201,14 @@ void RiveControl::replace_view_model(const String& p_path, const String& p_view_
     rive.replace_view_model(p_path, p_view_model, p_instance_name);
 }
 
+void RiveControl::focus_next_element() { rive.focus_move(0); }
+
+void RiveControl::focus_previous_element() { rive.focus_move(1); }
+
+void RiveControl::send_text_input(const String& p_text) {
+    rive.text_input(p_text);
+}
+
 Vector2 RiveControl::_get_minimum_size() const {
     // A Rive control can shrink; the artboard scales. Keep a small floor so
     // empty controls remain clickable in the editor.
@@ -216,8 +231,68 @@ void RiveControl::recreate_instance() {
     queue_redraw();
 }
 
+// Godot keycode -> rive's GLFW-style Key value (0 = unmapped).
+static int godot_key_to_rive(Key p_key) {
+    // Printable ASCII range matches directly (Godot KEY_A..KEY_Z == 65..90,
+    // digits/punctuation likewise).
+    const int code = int(p_key);
+    if (code >= 32 && code <= 96) {
+        return code;
+    }
+    switch (p_key) {
+        case KEY_ESCAPE: return 256;
+        case KEY_ENTER: return 257;
+        case KEY_KP_ENTER: return 335;
+        case KEY_TAB: return 258;
+        case KEY_BACKSPACE: return 259;
+        case KEY_INSERT: return 260;
+        case KEY_DELETE: return 261;
+        case KEY_RIGHT: return 262;
+        case KEY_LEFT: return 263;
+        case KEY_DOWN: return 264;
+        case KEY_UP: return 265;
+        case KEY_PAGEUP: return 266;
+        case KEY_PAGEDOWN: return 267;
+        case KEY_HOME: return 268;
+        case KEY_END: return 269;
+        case KEY_CAPSLOCK: return 280;
+        case KEY_SHIFT: return 340;      // leftShift
+        case KEY_CTRL: return 341;       // leftControl
+        case KEY_ALT: return 342;        // leftAlt
+        case KEY_META: return 343;       // leftSuper
+        default:
+            if (p_key >= KEY_F1 && p_key <= KEY_F12) {
+                return 290 + (int(p_key) - int(KEY_F1));
+            }
+            return 0;
+    }
+}
+
+static int godot_modifiers_to_rive(const Ref<InputEventWithModifiers>& p_event) {
+    int modifiers = 0;
+    if (p_event->is_shift_pressed()) modifiers |= 1;  // shift
+    if (p_event->is_ctrl_pressed()) modifiers |= 2;   // ctrl
+    if (p_event->is_alt_pressed()) modifiers |= 4;    // alt
+    if (p_event->is_meta_pressed()) modifiers |= 8;   // meta
+    return modifiers;
+}
+
 void RiveControl::_gui_input(const Ref<InputEvent>& p_event) {
     if (!rive.is_live()) {
+        return;
+    }
+    Ref<InputEventKey> key_event = p_event;
+    if (key_event.is_valid()) {
+        const int rive_key = godot_key_to_rive(key_event->get_keycode());
+        if (rive_key != 0) {
+            rive.key(rive_key, godot_modifiers_to_rive(key_event),
+                     key_event->is_pressed(), key_event->is_echo());
+            accept_event();
+        }
+        // Printable characters also flow as text input (Rive text fields).
+        if (key_event->is_pressed() && key_event->get_unicode() >= 32) {
+            rive.text_input(String::chr(key_event->get_unicode()));
+        }
         return;
     }
     Ref<InputEventMouseMotion> motion = p_event;
