@@ -135,6 +135,16 @@ $Menu.state_changed.connect(func(state_name: String):
     print("entered state: ", state_name))
 ```
 
+### Luau scripting in .riv files
+
+Script-bearing files (scripted drawables, path effects, interpolators, data
+converters authored in the Rive editor) just work — the runtime instances a
+sandboxed Luau VM per file. Scripts are **signature-verified against Rive's
+production key**: editor-exported files run their scripts; unsigned or
+sample-signed bytecode is rejected gracefully (the file still loads and
+plays its non-scripted content). There is no Godot→Luau channel by design —
+data binding and events are the handoff (see GOALS N3).
+
 ### Audio
 
 Rive audio events route through a shared engine that Godot's mixer pulls

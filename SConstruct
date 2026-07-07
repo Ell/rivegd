@@ -41,22 +41,25 @@ env.Append(
         "EXTERNAL_RIVE_AUDIO_ENGINE",
         "MA_NO_DEVICE_IO",
         "MA_NO_RESOURCE_MANAGER",
+        # Luau scripting (must match stage 1's --with_rive_scripting).
+        "WITH_RIVE_SCRIPTING",
     ]
 )
 # Link order matters: pls renderer first (uses rive + decoders), then rive,
 # then the (symbol-renamed) vendored deps. Explicit File nodes — SCons strips
 # the "lib" prefix from LIBS names, which turned liblibpng.a into the SYSTEM
 # -lpng (unrenamed symbols → dlopen failure).
-env.Append(
-    LIBS=[
-        File(os.path.join(rive_out, "lib%s.a" % name))
-        for name in [
-            "rive_pls_renderer", "rive_decoders", "rive", "rive_harfbuzz",
-            "rive_sheenbidi", "rive_yoga", "miniaudio", "libpng", "libjpeg",
-            "libwebp", "zlib",
-        ]
+# librive and librive_pls_renderer reference each other (scripting's GPU
+# canvas hooks) — group-link so ld rescans the archives.
+rive_libs = " ".join(
+    os.path.join(rive_out, "lib%s.a" % name)
+    for name in [
+        "rive_pls_renderer", "rive_decoders", "rive", "rive_harfbuzz",
+        "rive_sheenbidi", "rive_yoga", "miniaudio", "luau_vm",
+        "libpng", "libjpeg", "libwebp", "zlib",
     ]
 )
+env.Append(_LIBFLAGS=" -Wl,--start-group %s -Wl,--end-group" % rive_libs)
 
 # core/ and render/ (and rive's NoOpFactory) derive from rive types, which
 # are built rtti-off; compile them the same way. godot/ keeps godot-cpp's

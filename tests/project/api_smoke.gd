@@ -248,14 +248,80 @@ func _process(_delta: float) -> void:
 			return
 		print("audio peak observed: ", audio_peak)
 		_start_gamepad_phase()
+	elif frames == 810:
+		# Scripting (G5.4): a script-bearing file must load, instance, and
+		# advance without errors. (Sample-signed fixture scripts are
+		# rejected by the production key — behavior asserts come from a
+		# dev-key CI variant later.)
+		var scripted := RiveSprite2D.new()
+		scripted.file = load("res://fixtures/scripted_enum.riv")
+		add_child(scripted)
+		if not scripted.file.is_valid():
+			fail("scripted_enum.riv failed to load")
+			return
 	elif frames == 840:
-		# Hard assertion: the hand-built batch must be ACCEPTED by rive's
-		# parser (a malformed batch prints "malformed gamepad batch").
-		# gamepadLog changing is a bonus (the fixture may be script-driven,
-		# and scripting is not compiled in).
 		print("gamepadLog: ", gamepad_control.get_property("gamepadLog"))
+		_start_luau_phase()
+	elif frames == 900:
+		# Editor-signed Luau MUST have executed: the script rewrites 'label'
+		# (default "-no-script-") to "script-init"/"scaled:<n>". Anything but
+		# the default proves the VM ran the signed bytecode.
+		var echo := str(probe_sprite.get_property("label"))
+		if echo == "-no-script-" or echo == "":
+			fail("Luau did not run (label='%s' — script bytecode rejected or "
+					% echo + "scripting not compiled in)")
+			return
+		if not echo.begins_with("scaled:") and echo != "script-init":
+			fail("Luau ran but wrote unexpected label='%s'" % echo)
+			return
+		# Now drive a specific value through the script's update loop.
+		probe_sprite.set_property("box-scale", 5.0)
+	elif frames == 960:
+		var echo := str(probe_sprite.get_property("label"))
+		if echo != "scaled:5":
+			fail("Luau update loop wrong (label='%s', expected 'scaled:5')"
+					% echo)
+			return
+		print("LUAU BEHAVIORAL OK: ", echo)
+		_start_visual_vm_phase()
+	elif frames == 1000:
+		image_a = _screenshot()
+		_save(image_a, "api_smoke_vmvisual_base.png")
+		visual_control.set_property("box-scale", 3.0)
+		visual_control.set_property("box-color", Color.RED)
+	elif frames == 1040:
+		var image_b := _screenshot()
+		_save(image_b, "api_smoke_vmvisual_changed.png")
+		if image_a.get_data() == image_b.get_data():
+			fail("vm-visual pixels unchanged after scale+color set")
+			return
 		print("API SMOKE OK")
 		get_tree().quit(0)
+
+
+var probe_sprite: RiveSprite2D
+var visual_control: RiveControl
+
+
+func _start_luau_phase() -> void:
+	gamepad_control.queue_free()
+	# The scripted node lives on "fixtures", bound to VisVM. It writes the
+	# 'label' string: "script-init" on init, "scaled:<box-scale>" on change.
+	probe_sprite = RiveSprite2D.new()
+	probe_sprite.file = load("res://fixtures/rivegd_fixtures.riv")
+	probe_sprite.artboard = "fixtures"
+	probe_sprite.position = Vector2(32, 32)
+	add_child(probe_sprite)
+	probe_sprite.watch_property("label")
+
+
+func _start_visual_vm_phase() -> void:
+	visual_control = RiveControl.new()
+	visual_control.file = load("res://fixtures/rivegd_fixtures.riv")
+	visual_control.artboard = "fixtures"
+	visual_control.position = Vector2(500, 32)
+	visual_control.size = Vector2(450, 450)
+	add_child(visual_control)
 
 
 var gamepad_control: RiveControl
