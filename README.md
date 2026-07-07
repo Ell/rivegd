@@ -21,7 +21,7 @@ $RiveControl.rive_event.connect(func(name, props): print(name, props))
 | Events | `rive_event(name, properties)` with custom properties |
 | Data binding | **every** VM type: number/bool/string/color/enum (inspector dropdowns)/trigger/list/image/artboard/nested — writes, watch-based reads, `property_changed` |
 | Text | Rive's HarfBuzz/SheenBidi engine (symbol-renamed; coexists with Godot's) |
-| Scripting | Luau VM compiled in — editor-signed script-bearing files run; unsigned scripts rejected gracefully |
+| Scripting | Luau VM compiled in — editor-signed scripts **run** (behaviorally verified: a signed fixture drives a VM round-trip); unsigned scripts rejected gracefully |
 | Audio | Rive audio events through Godot's mixer via `RiveAudioStream` |
 | C# | full API via ClassDB, verified headless in CI |
 | Input | mouse/pointer listeners, keyboard+focus, gamepad batching |

@@ -25,6 +25,7 @@ static std::vector<uint8_t> read_file(const char* path) {
 }
 
 #define FIXTURE(name) ("thirdparty/rive-runtime/tests/unit_tests/assets/" name)
+#define OUR_FIXTURE(name) ("tests/project/fixtures/" name)
 
 TEST_CASE("garbage bytes fail cleanly with an error message") {
     std::vector<uint8_t> garbage = {0xde, 0xad, 0xbe, 0xef, 0x00, 0x01};
@@ -140,6 +141,23 @@ TEST_CASE("script-bearing files import cleanly (G5.4)") {
     auto file = rivegd::core::RivFile::import(bytes.data(), bytes.size());
     REQUIRE(file != nullptr);
     REQUIRE(!file->artboards().empty());
+}
+
+TEST_CASE("rivegd_fixtures.riv (editor-authored) enumerates as designed") {
+    auto bytes = read_file(OUR_FIXTURE("rivegd_fixtures.riv"));
+    auto file = rivegd::core::RivFile::import(bytes.data(), bytes.size());
+    REQUIRE(file != nullptr);
+
+    const auto* fixtures = file->find_artboard("fixtures");
+    REQUIRE(fixtures != nullptr);
+    bool scale = false, color = false, label = false, pulse = false;
+    for (const auto& p : fixtures->view_model_properties) {
+        if (p.name == "box-scale" && p.type == "number") scale = true;
+        if (p.name == "box-color" && p.type == "color") color = true;
+        if (p.name == "label" && p.type == "string") label = true;
+        if (p.name == "pulse" && p.type == "trigger") pulse = true;
+    }
+    REQUIRE((scale && color && label && pulse));
 }
 
 TEST_CASE("headless advance: instance a state machine and run it") {
