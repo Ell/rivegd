@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://rivegd_multi_smoke"]
+
+[ext_resource type="Script" path="res://multi_smoke.gd" id="1"]
+
+[node name="Multi" type="Node2D"]
+script = ExtResource("1")

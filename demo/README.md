@@ -11,6 +11,13 @@ doubles as example code:
   (`set_property`), with `watch_property` + `property_changed` feeding the log.
 - **Signal log**: `rive_event`, `state_changed`, `property_changed`.
 
+There are two scenes:
+- `main.tscn` — the API showcase (nodes, inputs, events, data binding).
+- `overlays.tscn` — the "Rive over a game" patterns: health bars that
+  follow moving enemies (independent `RiveSprite2D` children, data-bound)
+  and a `mouse_filter=IGNORE` dialogue box. (Uses test artboards as
+  stand-ins — swap in your own bar/dialogue `.riv`.)
+
 Run it (after building the extension — see the repo README):
 
 ```sh

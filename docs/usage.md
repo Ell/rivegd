@@ -198,6 +198,39 @@ re-exporting a `.riv` over the same file (or calling `set_data`) updates
 every live instance; inspector-set inputs and view-model properties are
 re-applied by name.
 
+### Overlays over a game (HUDs, health bars, dialogue)
+
+Rive shines as UI *over* gameplay. The patterns:
+
+- **World-anchored (health bar over an enemy):** make a `RiveSprite2D` a
+  **child** of the entity node — it follows automatically, captures no
+  input, and each instance is fully independent (many enemies = many bars,
+  each with its own data binding). Data-bind the bar to the entity's stats:
+
+  ```gdscript
+  var bar := RiveSprite2D.new()
+  bar.file = load("res://ui/health_bar.riv")
+  enemy.add_child(bar)                  # follows the enemy for free
+  # each frame / on damage:
+  bar.set_property("fill", enemy.health)   # independent per instance
+  ```
+
+- **Screen HUD / dialogue box:** a `RiveControl` with
+  `mouse_filter = MOUSE_FILTER_IGNORE` — it animates and data-binds but lets
+  gameplay clicks fall **through** to the game (verified). Use the default
+  `STOP` instead for a modal box that has its own buttons.
+- **In 3D:** put a `RiveTexture` on a billboarded quad's material for a
+  world-space bar, or a `RiveControl` in a `CanvasLayer` positioned each
+  frame from `camera.unproject_position(entity.global_position)`.
+
+Note today: `RiveControl` is a rectangular hit area — a click on a
+*transparent* region of the artboard doesn't fall through to a control
+directly behind it (use `IGNORE` for display-only overlays, or `STOP` for
+modal). Per-pixel click-through is a possible future addition.
+
+See `demo/overlays.tscn` for health bars following moving enemies + a
+dialogue box.
+
 ### Time
 
 - `playing` starts/stops advancing; `speed_scale` multiplies the delta

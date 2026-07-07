@@ -351,26 +351,30 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
         return;
     }
 
-    // Data binding: bind the artboard's default view model instance when it
-    // declares one; otherwise fall back to a fresh instance of the
-    // artboard's view model (no-op when the artboard has no view model).
-    rive::rcp<rive::ViewModelInstance> vmi;
+    // Data binding: create the instance through the ViewModelRuntime factory
+    // (which wires up the property runtimes and dirty-tracking) and bind its
+    // underlying ViewModelInstance. Constructing a ViewModelInstanceRuntime
+    // by hand around a raw createDefaultViewModelInstance() skips that setup,
+    // so writes reach get_property's cache but never re-drive the render.
     if (instance->artboard->viewModelId() != -1) { // silent when no VM at all
-        vmi = instance->file->createDefaultViewModelInstance(
-            instance->artboard);
-        if (vmi == nullptr) {
-            vmi = instance->file->createViewModelInstance(
-                instance->artboard);
+        rive::ViewModelRuntime* view_model_runtime =
+            instance->file->defaultArtboardViewModel(instance->artboard);
+        if (view_model_runtime != nullptr) {
+            rive::rcp<rive::ViewModelInstanceRuntime> vmi_runtime =
+                view_model_runtime->createDefaultInstance();
+            if (vmi_runtime == nullptr) {
+                vmi_runtime = view_model_runtime->createInstance();
+            }
+            if (vmi_runtime != nullptr) {
+                rive::rcp<rive::ViewModelInstance> vmi = vmi_runtime->instance();
+                if (instance->state_machine != nullptr) {
+                    instance->state_machine->bindViewModelInstance(vmi);
+                } else {
+                    instance->artboard->bindViewModelInstance(vmi);
+                }
+                instance->view_model = vmi_runtime;
+            }
         }
-    }
-    if (vmi != nullptr) {
-        if (instance->state_machine != nullptr) {
-            instance->state_machine->bindViewModelInstance(vmi);
-        } else {
-            instance->artboard->bindViewModelInstance(vmi);
-        }
-        instance->view_model = rive::rcp<rive::ViewModelInstanceRuntime>(
-            new rive::ViewModelInstanceRuntime(vmi));
     }
 
     // Create the shared texture and hand its native handle(s) to Rive.
