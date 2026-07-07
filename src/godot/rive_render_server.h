@@ -12,6 +12,8 @@
 namespace rive {
 class ArtboardInstance;
 class AudioEngine;
+class CommandQueue;
+class CommandServer;
 class File;
 class StateMachineInstance;
 template <typename T> class rcp;
@@ -167,6 +169,12 @@ private:
     static RiveRenderServer* singleton;
 
     std::unique_ptr<render::RenderBridge> bridge; // render thread only
+
+    // CommandQueue migration (docs/commandqueue-migration.md). M0: the
+    // queue/server exist and are pumped each frame; instance state still
+    // flows through the legacy rt_* path.
+    rive::rcp<rive::CommandQueue>* command_queue_storage = nullptr; // main
+    std::unique_ptr<rive::CommandServer> command_server; // render thread
     godot::HashMap<int64_t, Instance*> instances; // render thread only
     bool bridge_failed = false;                   // render thread only
     bool frame_hook_connected = false;            // main thread only

@@ -5,6 +5,8 @@
 #include "render/vulkan/vulkan_bridge.hpp"
 
 #include "rive/artboard.hpp"
+#include "rive/command_queue.hpp"
+#include "rive/command_server.hpp"
 #include "rive/audio/audio_engine.hpp"
 #include "rive/animation/animation_state.hpp"
 #include "rive/animation/linear_animation.hpp"
@@ -121,8 +123,16 @@ static Variant read_vm_property(rive::ViewModelInstanceValueRuntime* value) {
     }
 }
 
-RiveRenderServer::RiveRenderServer() = default;
-RiveRenderServer::~RiveRenderServer() = default;
+RiveRenderServer::RiveRenderServer() {
+    command_queue_storage =
+        new rive::rcp<rive::CommandQueue>(rive::make_rcp<rive::CommandQueue>());
+}
+
+RiveRenderServer::~RiveRenderServer() {
+    // The server must die before the queue reference drops.
+    command_server.reset();
+    delete command_queue_storage;
+}
 
 RiveRenderServer* RiveRenderServer::get_singleton() { return singleton; }
 
@@ -553,6 +563,17 @@ void RiveRenderServer::rt_render_instance(int64_t p_instance_id,
 }
 
 void RiveRenderServer::rt_flush_all() {
+    // Pump the CommandServer (M0: commands are not yet used for instance
+    // state; this proves pump placement on the render thread).
+    if (command_server == nullptr) {
+        static rive::NoOpFactory pump_factory;
+        rive::Factory* factory =
+            bridge != nullptr ? bridge->factory() : &pump_factory;
+        command_server = std::make_unique<rive::CommandServer>(
+            *command_queue_storage, factory);
+    }
+    command_server->processCommands();
+
     if (bridge == nullptr || instances.is_empty()) {
         return;
     }
