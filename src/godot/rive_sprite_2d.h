@@ -2,6 +2,7 @@
 
 #include "godot/rive_instance.h"
 
+#include <godot_cpp/classes/audio_stream_player.hpp>
 #include <godot_cpp/classes/node2d.hpp>
 
 namespace rivegd {
@@ -16,6 +17,12 @@ public:
 
     void set_artboard(const godot::String& p_artboard);
     godot::String get_artboard() const { return rive.artboard; }
+
+    // Non-empty routes THIS node's Rive audio to that Godot bus via an
+    // internal AudioStreamPlayer + dedicated engine (G5.3 per-node
+    // routing). Empty (default) mixes into the shared global stream.
+    void set_audio_bus(const godot::String& p_bus);
+    godot::String get_audio_bus() const { return audio_bus; }
 
     void set_fit(int p_fit);
     int get_fit() const { return rive.fit; }
@@ -96,6 +103,9 @@ private:
 
     RiveInstance rive;
     int alignment_index = 4; // Center
+    godot::String audio_bus;
+    godot::AudioStreamPlayer* audio_player = nullptr;
+    void update_audio_player();
     godot::Vector2i size = godot::Vector2i(512, 512);
     bool playing = true;
     bool pause_when_hidden = true;

@@ -213,6 +213,19 @@ for a in rive_file.get_asset_descriptions():
 
 `resolved=false` after load means the sibling file was missing.
 
+### Per-node audio routing
+
+By default every artboard's audio mixes into one shared stream (put a
+`RiveAudioStream` on any `AudioStreamPlayer`). To route one node's Rive
+audio to its own Godot bus (ducking, reverb zones, per-UI volume):
+
+```gdscript
+$Menu.audio_bus = "UI"   # done — internal player + dedicated engine
+```
+
+Power users can instead set `RiveAudioStream.instance_id` on their own
+player to pull a specific node's dedicated mix.
+
 ### Overlays over a game (HUDs, health bars, dialogue)
 
 Rive shines as UI *over* gameplay. The patterns:

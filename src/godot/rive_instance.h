@@ -24,6 +24,11 @@ public:
     // create(); changing them on a node recreates the instance.
     int fit = 0;
     godot::Vector2 alignment;
+    // Create a dedicated AudioEngine for this instance (per-node bus
+    // routing): pair with RiveAudioStream.instance_id = get_instance_id().
+    bool dedicated_audio = false;
+
+    int64_t get_instance_id() const { return instance_id; }
 
     // Posts instance creation (and replays cached inputs). No-op without a
     // valid file.

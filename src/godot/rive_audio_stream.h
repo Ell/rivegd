@@ -14,12 +14,21 @@ class RiveAudioStream : public godot::AudioStream {
 
 public:
     godot::Ref<godot::AudioStreamPlayback> _instantiate_playback() const override;
+
+    // 0 (default) mixes the shared engine (all instances). A node's
+    // instance id (nodes expose it when `audio_bus` routing is on) mixes
+    // only that node's dedicated engine.
+    void set_instance_id(int64_t p_id) { instance_id = p_id; }
+    int64_t get_instance_id() const { return instance_id; }
     godot::String _get_stream_name() const override { return "RiveAudio"; }
     double _get_length() const override { return 0.0; }
     bool _is_monophonic() const override { return false; }
 
 protected:
-    static void _bind_methods() {}
+    static void _bind_methods();
+
+private:
+    int64_t instance_id = 0;
 };
 
 class RiveAudioStreamPlayback : public godot::AudioStreamPlayback {
@@ -39,8 +48,10 @@ protected:
     static void _bind_methods();
 
 private:
+    friend class RiveAudioStream;
     bool active = false;
     float last_peak = 0.0f;
+    int64_t instance_id = 0;
 };
 
 } // namespace rivegd

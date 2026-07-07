@@ -91,11 +91,12 @@ void RiveInstance::create(const Vector2i& p_size) {
         const Vector2i size = p_size;
         const int fit_mode = fit;
         const Vector2 align = alignment;
+        const bool own_audio = dedicated_audio;
         queue->runOnce(
-            [server, id, fh, ah, sh, size, fit_mode, align](
+            [server, id, fh, ah, sh, size, fit_mode, align, own_audio](
                 rive::CommandServer*) {
                 server->rt_init_instance(id, fh, ah, sh, size, fit_mode,
-                                         align);
+                                         align, own_audio);
             });
         server->request_pump();
     }

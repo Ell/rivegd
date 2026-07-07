@@ -88,7 +88,8 @@ public:
                           uint64_t p_artboard_handle,
                           uint64_t p_state_machine_handle,
                           const godot::Vector2i& p_size, int p_fit,
-                          const godot::Vector2& p_alignment);
+                          const godot::Vector2& p_alignment,
+                          bool p_dedicated_audio);
     void rt_frame(int64_t p_instance_id, double p_delta); // advance only
     // Renders every instance that needs it in one batch (one submission).
     // Posted once per engine frame from the frame_pre_draw hook.
@@ -179,6 +180,11 @@ public:
     // floats. Safe once the engine exists (created lazily on the render
     // thread; guarded by an atomic pointer swap).
     int mix_audio(float* p_buffer, int p_frames);
+    // Per-instance mix (per-node bus routing, G5.3): pulls the dedicated
+    // engine created when the instance was initialized with dedicated
+    // audio. Audio-thread safe (short map lock; engine internally locked).
+    int mix_audio_instance(int64_t p_instance_id, float* p_buffer,
+                           int p_frames);
 
     // Blocking render for editor thumbnails: safe to call from any
     // non-render thread (the editor's preview thread); posts a one-shot
@@ -232,6 +238,10 @@ private:
     // Created on the render thread at first instance init; read from the
     // audio thread via mix_audio. rive::AudioEngine is internally locked.
     std::atomic<rive::AudioEngine*> audio_engine_raw{nullptr};
+    // Dedicated per-instance engines (rcp keeps them alive across the
+    // audio thread's short lock).
+    std::mutex audio_mutex;
+    godot::HashMap<int64_t, rive::rcp<rive::AudioEngine>> instance_engines;
 
     std::mutex thumbnail_mutex;
     std::condition_variable thumbnail_done;

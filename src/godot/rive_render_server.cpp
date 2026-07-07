@@ -374,7 +374,8 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
                                         uint64_t p_artboard_handle,
                                         uint64_t p_state_machine_handle,
                                         const Vector2i& p_size, int p_fit,
-                                        const Vector2& p_alignment) {
+                                        const Vector2& p_alignment,
+                                        bool p_dedicated_audio) {
     // The queue's loadFile/instantiate* commands ran earlier in this pump
     // (FIFO); the CommandServer owns the objects — we resolve and hold raw
     // pointers, releasing via queue deletes ordered after rt_free_instance.
@@ -488,15 +489,24 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
             instance->size.x, instance->size.y, native_a, native_b);
     }
 
-    // Route this artboard's audio events through the shared external
-    // engine (mixed into Godot's audio server via RiveAudioStream).
-    if (audio_engine_raw.load() == nullptr) {
+    // Route this artboard's audio: a dedicated engine when requested
+    // (per-node bus routing via RiveAudioStream.instance_id), otherwise
+    // the shared external engine (global RiveAudioStream mix).
+    if (p_dedicated_audio) {
         rive::rcp<rive::AudioEngine> engine = rive::AudioEngine::Make(
             2, uint32_t(AudioServer::get_singleton()->get_mix_rate()));
-        audio_engine_holder() = engine;
-        audio_engine_raw.store(engine.get());
+        instance->artboard->audioEngine(engine);
+        std::lock_guard<std::mutex> audio_lock(audio_mutex);
+        instance_engines[p_instance_id] = engine;
+    } else {
+        if (audio_engine_raw.load() == nullptr) {
+            rive::rcp<rive::AudioEngine> engine = rive::AudioEngine::Make(
+                2, uint32_t(AudioServer::get_singleton()->get_mix_rate()));
+            audio_engine_holder() = engine;
+            audio_engine_raw.store(engine.get());
+        }
+        instance->artboard->audioEngine(audio_engine_holder());
     }
-    instance->artboard->audioEngine(audio_engine_holder());
 
     instance->valid = true;
     instances[p_instance_id] = instance;
@@ -1296,6 +1306,26 @@ void RiveRenderServer::rt_list_get(int64_t p_instance_id, const String& p_path,
     property_mailbox[p_instance_id].push_back(change);
 }
 
+int RiveRenderServer::mix_audio_instance(int64_t p_instance_id,
+                                         float* p_buffer, int p_frames) {
+    rive::rcp<rive::AudioEngine> engine;
+    {
+        std::lock_guard<std::mutex> audio_lock(audio_mutex);
+        rive::rcp<rive::AudioEngine>* found =
+            instance_engines.getptr(p_instance_id);
+        if (found == nullptr) {
+            return 0;
+        }
+        engine = *found;
+    }
+    uint64_t frames_read = 0;
+    if (!engine->readAudioFrames(p_buffer, uint64_t(p_frames),
+                                 &frames_read)) {
+        return 0;
+    }
+    return int(frames_read);
+}
+
 int RiveRenderServer::mix_audio(float* p_buffer, int p_frames) {
     rive::AudioEngine* engine = audio_engine_raw.load();
     if (engine == nullptr) {
@@ -1434,6 +1464,10 @@ void RiveRenderServer::rt_render_thumbnail(const PackedByteArray& p_data,
 }
 
 void RiveRenderServer::rt_free_instance(int64_t p_instance_id) {
+    {
+        std::lock_guard<std::mutex> audio_lock(audio_mutex);
+        instance_engines.erase(p_instance_id);
+    }
     Instance** found = instances.getptr(p_instance_id);
     if (found == nullptr) {
         return;

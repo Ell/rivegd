@@ -49,7 +49,7 @@ runtime + Rive Renderer.
 | **Panel compositor** (many widgets → ONE render texture) | ✅ RivePanel | one texture per instance (GPU work batched, but N textures) |
 | **Procedural rendering** (drive Rive Renderer from C#: paths/paints/blends) | ✅ | not exposed to GDScript |
 | **DPI scaling modes** (reference/constant-pixel/constant-physical) | ✅ | none (Godot content-scale only) |
-| Per-widget audio routing / mixer groups | ✅ per-widget AudioProvider | one shared engine (per-node bus routing on the list) |
+| Per-widget audio routing / mixer groups | ✅ per-widget AudioProvider | ✅ `audio_bus` per node (dedicated engine + internal player; smoke-verified) |
 | RenderTexture → Rive image property | ✅ experimental (Metal/D3D/Vulkan) | Image/Texture2D via PNG re-encode only |
 | Scrolling + virtualization, N-slicing | ✅ advertised | untested (authored in Rive; runtime plumbing exists — needs fixtures/verification) |
 

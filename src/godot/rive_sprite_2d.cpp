@@ -1,5 +1,7 @@
 #include "godot/rive_sprite_2d.h"
 
+#include "godot/rive_audio_stream.h"
+
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/core/class_db.hpp>
 
@@ -13,6 +15,9 @@ void RiveSprite2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_artboard", "artboard"),
                          &RiveSprite2D::set_artboard);
     ClassDB::bind_method(D_METHOD("get_artboard"), &RiveSprite2D::get_artboard);
+    ClassDB::bind_method(D_METHOD("set_audio_bus", "bus"),
+                         &RiveSprite2D::set_audio_bus);
+    ClassDB::bind_method(D_METHOD("get_audio_bus"), &RiveSprite2D::get_audio_bus);
     ClassDB::bind_method(D_METHOD("set_fit", "fit"), &RiveSprite2D::set_fit);
     ClassDB::bind_method(D_METHOD("get_fit"), &RiveSprite2D::get_fit);
     ClassDB::bind_method(D_METHOD("set_alignment", "alignment"),
@@ -87,6 +92,8 @@ void RiveSprite2D::_bind_methods() {
                  "get_artboard");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "state_machine"),
                  "set_state_machine", "get_state_machine");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "audio_bus"),
+                 "set_audio_bus", "get_audio_bus");
     ADD_PROPERTY(PropertyInfo(Variant::INT, "fit", PROPERTY_HINT_ENUM,
                               "Contain,Cover,Fill,Fit Width,Fit Height,None,Scale Down,Layout"),
                  "set_fit", "get_fit");
@@ -134,6 +141,39 @@ void RiveSprite2D::set_artboard(const String& p_artboard) {
     recreate_instance();
     update_configuration_warnings();
     notify_property_list_changed();
+}
+
+void RiveSprite2D::set_audio_bus(const String& p_bus) {
+    audio_bus = p_bus;
+    rive.dedicated_audio = !audio_bus.is_empty();
+    recreate_instance();
+    update_audio_player();
+}
+
+void RiveSprite2D::update_audio_player() {
+    if (audio_bus.is_empty()) {
+        if (audio_player != nullptr) {
+            audio_player->queue_free();
+            audio_player = nullptr;
+        }
+        return;
+    }
+    if (audio_player == nullptr) {
+        audio_player = memnew(godot::AudioStreamPlayer);
+        Ref<RiveAudioStream> stream;
+        stream.instantiate();
+        audio_player->set_stream(stream);
+        add_child(audio_player, false, INTERNAL_MODE_BACK);
+    }
+    audio_player->set_bus(audio_bus);
+    Ref<RiveAudioStream> stream = audio_player->get_stream();
+    if (stream.is_valid()) {
+        stream->set_instance_id(rive.get_instance_id());
+    }
+    if (!audio_player->is_playing()) {
+        // play() before the player is READY is silently reset — defer.
+        audio_player->call_deferred("play");
+    }
 }
 
 void RiveSprite2D::set_fit(int p_fit) {
@@ -278,6 +318,7 @@ void RiveSprite2D::recreate_instance() {
     rive.create(size);
     set_process(playing && rive.is_live());
     queue_redraw();
+    update_audio_player(); // instance id changed; re-point the stream
 }
 
 PackedStringArray RiveSprite2D::_get_configuration_warnings() const {
