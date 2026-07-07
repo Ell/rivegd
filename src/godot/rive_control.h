@@ -53,6 +53,8 @@ public:
     void list_set_property(const godot::String& p_path, int p_index,
                            const godot::String& p_sub_path,
                            const godot::Variant& p_value);
+    void list_read_property(const godot::String& p_path, int p_index,
+                            const godot::String& p_sub_path);
     void set_artboard_property(const godot::String& p_path,
                                const godot::String& p_artboard_name);
     void replace_view_model(const godot::String& p_path,

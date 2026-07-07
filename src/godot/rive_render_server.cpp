@@ -868,6 +868,20 @@ static void set_vm_value(rive::ViewModelInstanceRuntime* vm,
     }
 }
 
+// Reads a scalar property off an arbitrary VM instance as a Variant.
+static Variant read_vm_value(rive::ViewModelInstanceRuntime* vm,
+                             const String& p_sub_path) {
+    if (vm == nullptr) {
+        return Variant();
+    }
+    const std::string path = p_sub_path.utf8().get_data();
+    if (auto* v = vm->propertyBoolean(path)) return read_vm_property(v);
+    if (auto* v = vm->propertyNumber(path)) return read_vm_property(v);
+    if (auto* v = vm->propertyString(path)) return read_vm_property(v);
+    if (auto* v = vm->propertyEnum(path)) return read_vm_property(v);
+    return Variant();
+}
+
 static rive::ViewModelInstanceListRuntime* resolve_list(
     RiveRenderServer* /*unused*/, rive::ViewModelInstanceRuntime* vm,
     const String& p_path) {
@@ -1172,6 +1186,24 @@ void RiveRenderServer::rt_list_set(int64_t p_instance_id, const String& p_path,
     }
     rive::rcp<rive::ViewModelInstanceRuntime> item = list->instanceAt(p_index);
     set_vm_value(item.get(), p_sub_path, p_value);
+}
+
+void RiveRenderServer::rt_list_get(int64_t p_instance_id, const String& p_path,
+                                   int p_index, const String& p_sub_path) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr) {
+        return;
+    }
+    auto* list = resolve_list(this, (*found)->view_model.get(), p_path);
+    if (list == nullptr || p_index < 0 || size_t(p_index) >= list->size()) {
+        return;
+    }
+    rive::rcp<rive::ViewModelInstanceRuntime> item = list->instanceAt(p_index);
+    Dictionary change;
+    change["path"] = p_path + String("[") + itos(p_index) + "]/" + p_sub_path;
+    change["value"] = read_vm_value(item.get(), p_sub_path);
+    std::lock_guard<std::mutex> lock(mailbox_mutex);
+    property_mailbox[p_instance_id].push_back(change);
 }
 
 int RiveRenderServer::mix_audio(float* p_buffer, int p_frames) {

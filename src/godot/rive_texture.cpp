@@ -66,6 +66,9 @@ void RiveTexture::_bind_methods() {
         D_METHOD("list_set_property", "path", "index", "sub_path", "value"),
         &RiveTexture::list_set_property);
     ClassDB::bind_method(
+        D_METHOD("list_read_property", "path", "index", "sub_path"),
+        &RiveTexture::list_read_property);
+    ClassDB::bind_method(
         D_METHOD("set_artboard_property", "path", "artboard_name"),
         &RiveTexture::set_artboard_property);
     ClassDB::bind_method(
@@ -179,6 +182,11 @@ void RiveTexture::list_set_property(const String& p_path, int p_index,
                               const String& p_sub_path,
                               const Variant& p_value) {
     rive.list_set_property(p_path, p_index, p_sub_path, p_value);
+}
+
+void RiveTexture::list_read_property(const String& p_path, int p_index,
+                               const String& p_sub_path) {
+    rive.list_read_property(p_path, p_index, p_sub_path);
 }
 
 void RiveTexture::set_artboard_property(const String& p_path,

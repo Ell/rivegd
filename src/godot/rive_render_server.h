@@ -150,6 +150,11 @@ public:
     void rt_list_set(int64_t p_instance_id, const godot::String& p_path,
                      int p_index, const godot::String& p_sub_path,
                      const godot::Variant& p_value);
+    // Reads a list item's scalar and posts it to the property mailbox under
+    // the synthetic path "<path>[<index>]/<sub_path>" (surfaced through
+    // property_changed / get_property like any watched value).
+    void rt_list_get(int64_t p_instance_id, const godot::String& p_path,
+                     int p_index, const godot::String& p_sub_path);
 
     // Audio-thread entry: mixes Rive's audio into interleaved stereo
     // floats. Safe once the engine exists (created lazily on the render

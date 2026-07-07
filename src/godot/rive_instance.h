@@ -64,6 +64,10 @@ public:
     void list_set_property(const godot::String& p_path, int p_index,
                            const godot::String& p_sub_path,
                            const godot::Variant& p_value);
+    // Async read: value arrives via property_changed at path
+    // "<path>[<index>]/<sub_path>" and is cached for get_property.
+    void list_read_property(const godot::String& p_path, int p_index,
+                            const godot::String& p_sub_path);
 
     // Artboard properties and nested view-model instance swapping.
     void set_artboard_property(const godot::String& p_path,

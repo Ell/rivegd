@@ -46,7 +46,7 @@ Design rationale and evidence live in [`docs/implementation-strategy.md`](docs/i
   | trigger | `fire_property_trigger()` + watchable (signal when fired) | ✅ |
   | enum | `String` value + inspector dropdown from the file's enum values | ✅ |
   | nested viewModel | slash paths (`"a/b/c"`) into nested properties; `replace_view_model` instance swapping | ✅ |
-  | list | append/remove_at/swap/clear + per-item property writes; watchable size | ✅ (item reads pending) |
+  | list | append/remove_at/swap/clear + per-item property read/write; watchable size | ✅ |
   | image | assign a Godot `Image`/`Texture2D` via `set_property` (PNG-encoded, decoded through the context factory) | ✅ API (no artboard-bound image fixture exists to verify visually) |
   | artboard | `set_artboard_property(path, artboard_name)` | ✅ |
 

@@ -59,6 +59,9 @@ void RiveControl::_bind_methods() {
         D_METHOD("list_set_property", "path", "index", "sub_path", "value"),
         &RiveControl::list_set_property);
     ClassDB::bind_method(
+        D_METHOD("list_read_property", "path", "index", "sub_path"),
+        &RiveControl::list_read_property);
+    ClassDB::bind_method(
         D_METHOD("set_artboard_property", "path", "artboard_name"),
         &RiveControl::set_artboard_property);
     ClassDB::bind_method(D_METHOD("set_gamepad_enabled", "enabled"),
@@ -199,6 +202,11 @@ void RiveControl::list_set_property(const String& p_path, int p_index,
                               const String& p_sub_path,
                               const Variant& p_value) {
     rive.list_set_property(p_path, p_index, p_sub_path, p_value);
+}
+
+void RiveControl::list_read_property(const String& p_path, int p_index,
+                               const String& p_sub_path) {
+    rive.list_read_property(p_path, p_index, p_sub_path);
 }
 
 void RiveControl::set_artboard_property(const String& p_path,

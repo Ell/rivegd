@@ -196,6 +196,18 @@ func _process(_delta: float) -> void:
 				or size_changes[-1] != size_changes[0] + 1:
 			fail("unexpected list size changes: %s" % [size_changes])
 			return
+		# List item read (G4.4): write a scalar on the appended item, then
+		# read it back through the async property mailbox.
+		var last: int = size_changes[-1] - 1
+		vm_sprite.list_set_property("Test List", last, "Test Num", 77.0)
+		vm_sprite.list_read_property("Test List", last, "Test Num")
+		list_item_key = "Test List[%d]/Test Num" % last
+	elif frames == 490:
+		var v = vm_sprite.get_property(list_item_key)
+		if v == null or not is_equal_approx(float(v), 77.0):
+			fail("list item read: %s = %s, expected 77" % [list_item_key, v])
+			return
+		print("list item read OK: ", list_item_key, " = ", v)
 		vm_sprite.list_clear("Test List")
 	elif frames == 500:
 		if int(vm_sprite.get_property("Test List")) != 0:
@@ -423,6 +435,7 @@ func _start_list_phase() -> void:
 
 
 var vm_sprite: RiveSprite2D
+var list_item_key := ""
 var property_changes: Array = []
 
 

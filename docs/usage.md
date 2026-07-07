@@ -105,6 +105,7 @@ Lists hold view-model instances; watch the list path to observe its size:
 $HUD.watch_property("inventory")                  # size changes via property_changed
 $HUD.list_append("inventory", "ItemVM")           # instance of a named view model
 $HUD.list_set_property("inventory", 0, "label", "Sword")
+$HUD.list_read_property("inventory", 0, "label")   # -> property_changed("inventory[0]/label", ...)
 $HUD.list_swap("inventory", 0, 1)
 $HUD.list_remove_at("inventory", 0)
 $HUD.list_clear("inventory")

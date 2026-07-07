@@ -291,6 +291,11 @@ void RiveInstance::list_set_property(const String& p_path, int p_index,
     RIVEGD_POST(rt_list_set, p_path, p_index, p_sub_path, p_value);
 }
 
+void RiveInstance::list_read_property(const String& p_path, int p_index,
+                                      const String& p_sub_path) {
+    RIVEGD_POST(rt_list_get, p_path, p_index, p_sub_path);
+}
+
 void RiveInstance::set_artboard_property(const String& p_path,
                                          const String& p_artboard_name) {
     RIVEGD_POST(rt_set_vm_artboard, p_path, p_artboard_name);
