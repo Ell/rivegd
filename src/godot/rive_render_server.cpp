@@ -19,6 +19,8 @@
 #include "rive/viewmodel/viewmodel_instance.hpp"
 
 #include <godot_cpp/templates/local_vector.hpp>
+
+#include <chrono>
 #include "rive/custom_property_boolean.hpp"
 #include "rive/custom_property_number.hpp"
 #include "rive/custom_property_string.hpp"
@@ -676,6 +678,50 @@ void RiveRenderServer::rt_watch_vm_property(int64_t p_instance_id,
     change["value"] = read_vm_property(value);
     std::lock_guard<std::mutex> lock(mailbox_mutex);
     property_mailbox[p_instance_id].push_back(change);
+}
+
+Ref<Image> RiveRenderServer::render_thumbnail(const PackedByteArray& p_data,
+                                              const Vector2i& p_size) {
+    {
+        std::lock_guard<std::mutex> lock(thumbnail_mutex);
+        thumbnail_ready = false;
+        thumbnail_result.unref();
+    }
+    RenderingServer::get_singleton()->call_on_render_thread(
+        callable_mp(this, &RiveRenderServer::rt_render_thumbnail)
+            .bind(p_data, p_size));
+    std::unique_lock<std::mutex> lock(thumbnail_mutex);
+    if (!thumbnail_done.wait_for(lock, std::chrono::seconds(4),
+                                 [this] { return thumbnail_ready; })) {
+        return Ref<Image>();
+    }
+    return thumbnail_result;
+}
+
+void RiveRenderServer::rt_render_thumbnail(const PackedByteArray& p_data,
+                                           const Vector2i& p_size) {
+    Ref<Image> result;
+    // Reuse the whole instance pipeline for a one-shot offscreen render.
+    const int64_t id = allocate_instance_id();
+    rt_init_instance(id, p_data, String(), String(), p_size);
+    if (instances.has(id)) {
+        rt_frame(id, 0.0);
+        if (bridge != nullptr) {
+            bridge->wait_idle();
+        }
+        Instance* instance = instances[id];
+        if (instance->rs_texture.is_valid()) {
+            result = RenderingServer::get_singleton()->texture_2d_get(
+                instance->rs_texture);
+        }
+        rt_free_instance(id);
+    }
+    {
+        std::lock_guard<std::mutex> lock(thumbnail_mutex);
+        thumbnail_result = result;
+        thumbnail_ready = true;
+    }
+    thumbnail_done.notify_all();
 }
 
 void RiveRenderServer::rt_free_instance(int64_t p_instance_id) {

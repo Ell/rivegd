@@ -21,6 +21,7 @@ static Ref<rivegd::RiveFileLoader> riv_loader;
 void initialize_rivegd_module(ModuleInitializationLevel p_level) {
     if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
         GDREGISTER_INTERNAL_CLASS(rivegd::RiveInspectorPlugin);
+        GDREGISTER_INTERNAL_CLASS(rivegd::RivePreviewGenerator);
         GDREGISTER_INTERNAL_CLASS(rivegd::RiveEditorPlugin);
         EditorPlugins::add_by_type<rivegd::RiveEditorPlugin>();
         return;

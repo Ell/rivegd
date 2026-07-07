@@ -2,6 +2,8 @@
 
 #include <godot_cpp/classes/editor_inspector_plugin.hpp>
 #include <godot_cpp/classes/editor_plugin.hpp>
+#include <godot_cpp/classes/editor_resource_preview_generator.hpp>
+#include <godot_cpp/classes/texture2d.hpp>
 
 namespace rivegd {
 
@@ -20,6 +22,22 @@ protected:
     static void _bind_methods() {}
 };
 
+// FileSystem-dock thumbnails: renders the default artboard's first frame
+// through the real renderer (GOALS G3.2).
+class RivePreviewGenerator : public godot::EditorResourcePreviewGenerator {
+    GDCLASS(RivePreviewGenerator, godot::EditorResourcePreviewGenerator)
+
+public:
+    bool _handles(const godot::String& p_type) const override;
+    godot::Ref<godot::Texture2D> _generate(
+        const godot::Ref<godot::Resource>& p_resource,
+        const godot::Vector2i& p_size,
+        const godot::Dictionary& p_metadata) const override;
+
+protected:
+    static void _bind_methods() {}
+};
+
 class RiveEditorPlugin : public godot::EditorPlugin {
     GDCLASS(RiveEditorPlugin, godot::EditorPlugin)
 
@@ -32,6 +50,7 @@ protected:
 
 private:
     godot::Ref<RiveInspectorPlugin> inspector_plugin;
+    godot::Ref<RivePreviewGenerator> preview_generator;
 };
 
 } // namespace rivegd

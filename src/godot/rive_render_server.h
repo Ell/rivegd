@@ -1,9 +1,11 @@
 #pragma once
 
+#include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/templates/hash_map.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 
@@ -93,6 +95,14 @@ public:
     void rt_watch_vm_property(int64_t p_instance_id,
                               const godot::String& p_path);
 
+    // Blocking render for editor thumbnails: safe to call from any
+    // non-render thread (the editor's preview thread); posts a one-shot
+    // render to the render thread and waits (with timeout).
+    godot::Ref<godot::Image> render_thumbnail(
+        const godot::PackedByteArray& p_data, const godot::Vector2i& p_size);
+    void rt_render_thumbnail(const godot::PackedByteArray& p_data,
+                             const godot::Vector2i& p_size);
+
 protected:
     static void _bind_methods();
 
@@ -115,6 +125,11 @@ private:
     godot::HashMap<int64_t, godot::Array> property_mailbox;
 
     std::atomic<int64_t> next_instance_id{1};
+
+    std::mutex thumbnail_mutex;
+    std::condition_variable thumbnail_done;
+    godot::Ref<godot::Image> thumbnail_result;
+    bool thumbnail_ready = false;
 };
 
 } // namespace rivegd

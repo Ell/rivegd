@@ -4,7 +4,12 @@
 #include "godot/rive_file_resource.h"
 #include "godot/rive_sprite_2d.h"
 
+#include "godot/rive_render_server.h"
+
 #include <godot_cpp/classes/button.hpp>
+#include <godot_cpp/classes/editor_interface.hpp>
+#include <godot_cpp/classes/editor_resource_preview.hpp>
+#include <godot_cpp/classes/image_texture.hpp>
 #include <godot_cpp/classes/v_box_container.hpp>
 
 using namespace godot;
@@ -69,12 +74,40 @@ void RiveInspectorPlugin::_parse_begin(Object* p_object) {
     }
 }
 
+bool RivePreviewGenerator::_handles(const String& p_type) const {
+    return p_type == "RiveFileResource";
+}
+
+Ref<Texture2D> RivePreviewGenerator::_generate(const Ref<Resource>& p_resource,
+                                               const Vector2i& p_size,
+                                               const Dictionary&) const {
+    Ref<RiveFileResource> file = p_resource;
+    if (file.is_null() || !file->is_valid()) {
+        return Ref<Texture2D>();
+    }
+    RiveRenderServer* server = RiveRenderServer::get_singleton();
+    if (server == nullptr) {
+        return Ref<Texture2D>();
+    }
+    Ref<Image> image = server->render_thumbnail(file->get_data(), p_size);
+    if (image.is_null()) {
+        return Ref<Texture2D>();
+    }
+    return ImageTexture::create_from_image(image);
+}
+
 void RiveEditorPlugin::_enter_tree() {
     inspector_plugin.instantiate();
     add_inspector_plugin(inspector_plugin);
+    preview_generator.instantiate();
+    get_editor_interface()->get_resource_previewer()->add_preview_generator(
+        preview_generator);
 }
 
 void RiveEditorPlugin::_exit_tree() {
+    get_editor_interface()->get_resource_previewer()->remove_preview_generator(
+        preview_generator);
+    preview_generator.unref();
     remove_inspector_plugin(inspector_plugin);
     inspector_plugin.unref();
 }
