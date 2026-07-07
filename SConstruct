@@ -49,6 +49,7 @@ sources = (
     + [core_env.SharedObject(f) for f in Glob("src/render/*/*.cpp")]
     + [core_env.SharedObject("thirdparty/rive-runtime/utils/no_op_factory.cpp")]
     + Glob("src/godot/*.cpp")
+    + Glob("src/godot/editor/*.cpp")
 )
 
 if env["platform"] == "macos":
