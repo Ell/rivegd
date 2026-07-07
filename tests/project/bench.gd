@@ -1,7 +1,9 @@
 # Tier 5 benchmark (GOALS G7.3 / success criterion 4): N live artboards,
 # measure frame times, compare against a budget.
 #   godot --path tests/project bench.tscn
-# Env: RIVEGD_BENCH_COUNT (default 50), RIVEGD_BENCH_BUDGET_MS (default 16.0)
+# Env: RIVEGD_BENCH_COUNT (default 50), RIVEGD_BENCH_BUDGET_MS (default 16.0),
+#      RIVEGD_BENCH_FIXTURE (res:// path), RIVEGD_BENCH_ARTBOARD,
+#      RIVEGD_BENCH_SIZE (square texture px)
 extends Node2D
 
 const WARMUP_FRAMES := 90
@@ -15,7 +17,9 @@ func _ready() -> void:
 	var count := int(OS.get_environment("RIVEGD_BENCH_COUNT").to_int())
 	if count <= 0:
 		count = 50
-	var res := load("res://fixtures/bullet_man.riv")
+	var res := load(OS.get_environment("RIVEGD_BENCH_FIXTURE")
+		if OS.get_environment("RIVEGD_BENCH_FIXTURE") != ""
+		else "res://fixtures/bullet_man.riv")
 	if res == null:
 		push_error("BENCH FAIL: fixture missing")
 		get_tree().quit(1)
@@ -24,7 +28,11 @@ func _ready() -> void:
 	for i in count:
 		var sprite: RiveSprite2D = RiveSprite2D.new()
 		sprite.file = res
-		sprite.size = Vector2i(128, 128)
+		var ab := OS.get_environment("RIVEGD_BENCH_ARTBOARD")
+		if ab != "":
+			sprite.artboard = ab
+		var px := int(OS.get_environment("RIVEGD_BENCH_SIZE").to_int())
+		sprite.size = Vector2i(px, px) if px > 0 else Vector2i(128, 128)
 		sprite.position = Vector2(
 				(i % columns) * 130 + 8, (i / columns) * 130 + 8)
 		add_child(sprite)

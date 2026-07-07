@@ -251,6 +251,21 @@ $Menu.audio_bus = "UI"   # done — internal player + dedicated engine
 Power users can instead set `RiveAudioStream.instance_id` on their own
 player to pull a specific node's dedicated mix.
 
+### Dynamic lists (inventories, card grids)
+
+Author a component artboard + a list artboard whose view model has a
+`list` property feeding a component list (see
+`tests/project/fixtures/README.md` for the recipe). Then from GDScript:
+
+```gdscript
+$Grid.list_append("items", "CardVM")          # a card appears in the layout
+$Grid.list_set_property("items", 1, "value", 0.25)  # only card 1 changes
+$Grid.list_clear("items")                     # grid empties
+```
+
+Verified end-to-end by `cards_smoke`; 200-500 static cards bench at ~6 ms
+(settled instances sleep — G4.6).
+
 ### Overlays over a game (HUDs, health bars, dialogue)
 
 Rive shines as UI *over* gameplay. The patterns:
