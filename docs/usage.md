@@ -238,6 +238,14 @@ Rive shines as UI *over* gameplay. The patterns:
   world-space bar, or a `RiveControl` in a `CanvasLayer` positioned each
   frame from `camera.unproject_position(entity.global_position)`.
 
+### Multitouch
+
+Touch input tracks per finger: `InputEventScreenTouch`/`ScreenDrag` forward
+their touch index as the Rive pointer id, so simultaneous presses (dual
+thumbsticks, pinch UIs, multi-button boards) work as authored.
+`send_pointer_event(phase, position, pointer_id)` exposes the same for
+programmatic/3D input.
+
 ### Interactive Rive on 3D surfaces
 
 `RiveTexture` works in any material, and it accepts pointer input in **UV

@@ -353,8 +353,8 @@ void RiveInstance::fire_trigger(const String& p_name) {
 }
 
 void RiveInstance::pointer(int p_phase, const Vector2& p_local,
-                           const Vector2& p_node_size) {
-    RIVEGD_POST(rt_pointer, p_phase, p_local, p_node_size);
+                           const Vector2& p_node_size, int p_pointer_id) {
+    RIVEGD_POST(rt_pointer, p_phase, p_local, p_node_size, p_pointer_id);
 }
 
 void RiveInstance::get_property_list(List<PropertyInfo>* p_list) const {

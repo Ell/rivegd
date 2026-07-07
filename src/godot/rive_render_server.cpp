@@ -710,7 +710,8 @@ void RiveRenderServer::rt_fire_trigger(int64_t p_instance_id,
 
 void RiveRenderServer::rt_pointer(int64_t p_instance_id, int p_phase,
                                   const Vector2& p_local,
-                                  const Vector2& p_node_size) {
+                                  const Vector2& p_node_size,
+                                  int p_pointer_id) {
     Instance** found = instances.getptr(p_instance_id);
     if (found == nullptr || (*found)->state_machine == nullptr) {
         return;
@@ -733,16 +734,17 @@ void RiveRenderServer::rt_pointer(int64_t p_instance_id, int p_phase,
 
     switch (p_phase) {
         case POINTER_MOVE:
-            instance->state_machine->pointerMove(position);
+            instance->state_machine->pointerMove(position, 0.0f,
+                                                 p_pointer_id);
             break;
         case POINTER_DOWN:
-            instance->state_machine->pointerDown(position);
+            instance->state_machine->pointerDown(position, p_pointer_id);
             break;
         case POINTER_UP:
-            instance->state_machine->pointerUp(position);
+            instance->state_machine->pointerUp(position, p_pointer_id);
             break;
         case POINTER_EXIT:
-            instance->state_machine->pointerExit(position);
+            instance->state_machine->pointerExit(position, p_pointer_id);
             break;
     }
     // Listener-fired events are reported immediately and would be cleared

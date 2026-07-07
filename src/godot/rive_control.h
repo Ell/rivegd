@@ -76,7 +76,8 @@ public:
 
     // Programmatic pointer injection (control-local coordinates); phase:
     // 0 = move, 1 = down, 2 = up, 3 = exit. Same path as _gui_input.
-    void send_pointer_event(int p_phase, const godot::Vector2& p_position);
+    void send_pointer_event(int p_phase, const godot::Vector2& p_position,
+                            int p_pointer_id = 0);
 
     void focus_next_element();
     void focus_previous_element();

@@ -5,6 +5,8 @@
 #include <godot_cpp/classes/input_event_key.hpp>
 #include <godot_cpp/classes/input_event_mouse_button.hpp>
 #include <godot_cpp/classes/input_event_mouse_motion.hpp>
+#include <godot_cpp/classes/input_event_screen_drag.hpp>
+#include <godot_cpp/classes/input_event_screen_touch.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/core/class_db.hpp>
 
@@ -80,8 +82,9 @@ void RiveControl::_bind_methods() {
                          &RiveControl::get_gamepad_enabled);
     ClassDB::bind_method(D_METHOD("submit_gamepad_batch", "batch"),
                          &RiveControl::submit_gamepad_batch);
-    ClassDB::bind_method(D_METHOD("send_pointer_event", "phase", "position"),
-                         &RiveControl::send_pointer_event);
+    ClassDB::bind_method(
+        D_METHOD("send_pointer_event", "phase", "position", "pointer_id"),
+        &RiveControl::send_pointer_event, DEFVAL(0));
     ClassDB::bind_method(D_METHOD("focus_next_element"),
                          &RiveControl::focus_next_element);
     ClassDB::bind_method(D_METHOD("focus_previous_element"),
@@ -267,9 +270,10 @@ void RiveControl::submit_gamepad_batch(const PackedByteArray& p_batch) {
     rive.gamepads(p_batch);
 }
 
-void RiveControl::send_pointer_event(int p_phase, const Vector2& p_position) {
+void RiveControl::send_pointer_event(int p_phase, const Vector2& p_position,
+                                     int p_pointer_id) {
     if (rive.is_live()) {
-        rive.pointer(p_phase, p_position, get_size());
+        rive.pointer(p_phase, p_position, get_size(), p_pointer_id);
     }
 }
 
@@ -365,6 +369,22 @@ void RiveControl::_gui_input(const Ref<InputEvent>& p_event) {
         if (key_event->is_pressed() && key_event->get_unicode() >= 32) {
             rive.text_input(String::chr(key_event->get_unicode()));
         }
+        return;
+    }
+    // Multitouch: each finger keeps its Godot touch index as the rive
+    // pointer id, so simultaneous presses track independently.
+    Ref<InputEventScreenTouch> touch = p_event;
+    if (touch.is_valid()) {
+        rive.pointer(touch->is_pressed() ? RiveRenderServer::POINTER_DOWN
+                                         : RiveRenderServer::POINTER_UP,
+                     touch->get_position(), get_size(), touch->get_index());
+        accept_event();
+        return;
+    }
+    Ref<InputEventScreenDrag> drag = p_event;
+    if (drag.is_valid()) {
+        rive.pointer(RiveRenderServer::POINTER_MOVE, drag->get_position(),
+                     get_size(), drag->get_index());
         return;
     }
     Ref<InputEventMouseMotion> motion = p_event;

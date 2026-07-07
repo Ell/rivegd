@@ -45,7 +45,7 @@ runtime + Rive Renderer.
 | **Shipped platforms** | D3D11, Metal (macOS/iOS), OpenGL (Win/Android), Vulkan (Win/Android/Linux), WebGL | Linux Vulkan today; GL bridge written (Android/WebGL2 targets); Metal/D3D12/web pending hardware/phase 4. **Biggest gap.** |
 | Out-of-band assets (referenced images/fonts/audio) | ✅ shipped | ✅ shipped (sibling-file convention, queue global registry; smoke-verified) |
 | **Listener-aware hit testing** (`Translucent`: blocks pointer only where an interactive listener is) | ✅ per-widget Hit Test Behavior | rect-only (STOP/IGNORE); needs a sync hit query our render-thread model doesn't expose yet |
-| **Multitouch** | ✅ | single pointer (Godot touch→mouse) |
+| Multitouch | ✅ | ✅ per-finger pointer ids (touch index → rive pointerId; smoke-verified) |
 | **Panel compositor** (many widgets → ONE render texture) | ✅ RivePanel | one texture per instance (GPU work batched, but N textures) |
 | **Procedural rendering** (drive Rive Renderer from C#: paths/paints/blends) | ✅ | not exposed to GDScript |
 | **DPI scaling modes** (reference/constant-pixel/constant-physical) | ✅ | none (Godot content-scale only) |

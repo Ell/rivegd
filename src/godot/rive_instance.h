@@ -77,7 +77,7 @@ public:
                             const godot::String& p_view_model,
                             const godot::String& p_instance_name);
     void pointer(int p_phase, const godot::Vector2& p_local,
-                 const godot::Vector2& p_node_size);
+                 const godot::Vector2& p_node_size, int p_pointer_id = 0);
     void key(int p_rive_key, int p_modifiers, bool p_pressed, bool p_repeat);
     void text_input(const godot::String& p_text);
     void focus_move(int p_direction);
