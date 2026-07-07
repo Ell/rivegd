@@ -88,6 +88,9 @@ private:
     void post_input(const godot::String& p_name, const godot::Variant& p_value);
 
     int64_t instance_id = 0;
+    uint64_t file_handle = 0;
+    uint64_t artboard_handle = 0;
+    uint64_t state_machine_handle = 0;
     godot::RID canvas_texture;
     godot::RID rd_texture;
     bool texture_bound = false;

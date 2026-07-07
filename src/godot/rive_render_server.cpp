@@ -64,9 +64,15 @@ static rive::rcp<rive::AudioEngine>& audio_engine_holder() {
 }
 
 struct RiveRenderServer::Instance {
-    rive::rcp<rive::File> file;
-    std::unique_ptr<rive::ArtboardInstance> artboard;
-    std::unique_ptr<rive::StateMachineInstance> state_machine;
+    // Owned by the CommandServer; resolved once at init from the handles
+    // below and stable until the queue's delete commands run (which our
+    // release path orders after rt_free_instance).
+    rive::File* file = nullptr;
+    rive::ArtboardInstance* artboard = nullptr;
+    rive::StateMachineInstance* state_machine = nullptr;
+    rive::FileHandle file_handle = RIVE_NULL_HANDLE;
+    rive::ArtboardHandle artboard_handle = RIVE_NULL_HANDLE;
+    rive::StateMachineHandle state_machine_handle = RIVE_NULL_HANDLE;
     rive::rcp<rive::ViewModelInstanceRuntime> view_model;
     rive::rcp<rive::gpu::RenderTarget> target;
     RID rd_texture; // RD-path only
@@ -161,9 +167,14 @@ void RiveRenderServer::free_singleton() {
     }
 }
 
-void RiveRenderServer::on_frame_pre_draw() {
-    RenderingServer::get_singleton()->call_on_render_thread(
-        callable_mp(this, &RiveRenderServer::rt_flush_all));
+void RiveRenderServer::on_frame_pre_draw() { request_pump(); }
+
+void RiveRenderServer::request_pump() {
+    bool expected = false;
+    if (pump_pending.compare_exchange_strong(expected, true)) {
+        RenderingServer::get_singleton()->call_on_render_thread(
+            callable_mp(this, &RiveRenderServer::rt_flush_all));
+    }
 }
 
 void RiveRenderServer::_bind_methods() {
@@ -177,14 +188,22 @@ void RiveRenderServer::_bind_methods() {
                          &RiveRenderServer::rt_free_instance);
 }
 
-int64_t RiveRenderServer::allocate_instance_id() {
+void RiveRenderServer::ensure_frame_hook() {
     if (!frame_hook_connected) {
         frame_hook_connected = true;
         RenderingServer::get_singleton()->connect(
             "frame_pre_draw",
             callable_mp(this, &RiveRenderServer::on_frame_pre_draw));
     }
+}
+
+int64_t RiveRenderServer::allocate_instance_id() {
+    ensure_frame_hook();
     return next_instance_id.fetch_add(1);
+}
+
+rive::CommandQueue* RiveRenderServer::queue() {
+    return command_queue_storage->get();
 }
 
 RID RiveRenderServer::get_texture_rid(int64_t p_instance_id) {
@@ -304,46 +323,32 @@ bool RiveRenderServer::rt_ensure_bridge() {
 }
 
 void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
-                                        const PackedByteArray& p_data,
-                                        const String& p_artboard,
-                                        const String& p_state_machine,
+                                        uint64_t p_file_handle,
+                                        uint64_t p_artboard_handle,
+                                        uint64_t p_state_machine_handle,
                                         const Vector2i& p_size) {
-    // Without a GPU bridge (headless / unsupported driver) instances still
-    // run logic-only: state machines, inputs, events, data binding — no
-    // rendering (GOALS G2.4).
+    // The queue's loadFile/instantiate* commands ran earlier in this pump
+    // (FIFO); the CommandServer owns the objects — we resolve and hold raw
+    // pointers, releasing via queue deletes ordered after rt_free_instance.
     const bool has_bridge = rt_ensure_bridge();
-    static rive::NoOpFactory logic_only_factory;
 
     Instance* instance = memnew(Instance);
     instance->size = Vector2i(MAX(1, p_size.x), MAX(1, p_size.y));
+    instance->file_handle = reinterpret_cast<rive::FileHandle>(p_file_handle);
+    instance->artboard_handle =
+        reinterpret_cast<rive::ArtboardHandle>(p_artboard_handle);
+    instance->state_machine_handle =
+        reinterpret_cast<rive::StateMachineHandle>(p_state_machine_handle);
 
-    // Import against the render context's factory: the GPU resources the
-    // file creates belong to this context.
-    rive::ImportResult result;
-    instance->file =
-        rive::File::import(rive::Span<const uint8_t>(p_data.ptr(), p_data.size()),
-                           has_bridge ? bridge->factory() : &logic_only_factory,
-                           &result);
-    if (instance->file == nullptr) {
-        ERR_PRINT("rivegd: .riv import failed on render context");
+    instance->file = command_server->getFile(instance->file_handle);
+    instance->artboard =
+        command_server->getArtboardInstance(instance->artboard_handle);
+    instance->state_machine = command_server->getStateMachineInstance(
+        instance->state_machine_handle);
+    if (instance->file == nullptr || instance->artboard == nullptr) {
+        ERR_PRINT("rivegd: file/artboard failed to load (bad data or name)");
         memdelete(instance);
         return;
-    }
-
-    instance->artboard = p_artboard.is_empty()
-        ? instance->file->artboardDefault()
-        : instance->file->artboardNamed(p_artboard.utf8().get_data());
-    if (instance->artboard == nullptr) {
-        ERR_PRINT("rivegd: artboard not found: " + p_artboard);
-        memdelete(instance);
-        return;
-    }
-
-    if (!p_state_machine.is_empty()) {
-        instance->state_machine = instance->artboard->stateMachineNamed(
-            p_state_machine.utf8().get_data());
-    } else if (instance->artboard->stateMachineCount() > 0) {
-        instance->state_machine = instance->artboard->stateMachineAt(0);
     }
 
     // Data binding: bind the artboard's default view model instance when it
@@ -352,10 +357,10 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
     rive::rcp<rive::ViewModelInstance> vmi;
     if (instance->artboard->viewModelId() != -1) { // silent when no VM at all
         vmi = instance->file->createDefaultViewModelInstance(
-            instance->artboard.get());
+            instance->artboard);
         if (vmi == nullptr) {
             vmi = instance->file->createViewModelInstance(
-                instance->artboard.get());
+                instance->artboard);
         }
     }
     if (vmi != nullptr) {
@@ -584,9 +589,14 @@ void RiveRenderServer::rt_render_instance(int64_t p_instance_id,
 }
 
 void RiveRenderServer::rt_flush_all() {
-    // Pump the CommandServer (M0: commands are not yet used for instance
-    // state; this proves pump placement on the render thread).
+    pump_pending.store(false);
+    // Pump the CommandServer. Its Factory is fixed at construction and
+    // files import through it — the GPU bridge MUST be resolved first, or
+    // everything silently imports with no-op render paths and draws
+    // nothing. NoOpFactory is only correct when no bridge can ever exist
+    // (headless), which is exactly what rt_ensure_bridge determines.
     if (command_server == nullptr) {
+        rt_ensure_bridge();
         static rive::NoOpFactory pump_factory;
         rive::Factory* factory =
             bridge != nullptr ? bridge->factory() : &pump_factory;
@@ -960,7 +970,7 @@ void RiveRenderServer::rt_focus_move(int64_t p_instance_id, int p_direction) {
     }
     (*found)->settled = false;
     (*found)->needs_render = true;
-    rive::StateMachineInstance* sm = (*found)->state_machine.get();
+    rive::StateMachineInstance* sm = (*found)->state_machine;
     rive::FocusManager* focus = sm->focusManager();
     switch (p_direction) {
         case 0: sm->focusNext(); break;
@@ -1183,9 +1193,11 @@ Ref<Image> RiveRenderServer::render_thumbnail(const PackedByteArray& p_data,
         thumbnail_ready = false;
         thumbnail_result.unref();
     }
-    RenderingServer::get_singleton()->call_on_render_thread(
-        callable_mp(this, &RiveRenderServer::rt_render_thumbnail)
-            .bind(p_data, p_size));
+    ensure_frame_hook();
+    queue()->runOnce([this, p_data, p_size](rive::CommandServer*) {
+        rt_render_thumbnail(p_data, p_size);
+    });
+    request_pump();
     std::unique_lock<std::mutex> lock(thumbnail_mutex);
     if (!thumbnail_done.wait_for(lock, std::chrono::seconds(4),
                                  [this] { return thumbnail_ready; })) {
@@ -1197,22 +1209,100 @@ Ref<Image> RiveRenderServer::render_thumbnail(const PackedByteArray& p_data,
 void RiveRenderServer::rt_render_thumbnail(const PackedByteArray& p_data,
                                            const Vector2i& p_size) {
     Ref<Image> result;
-    // Reuse the whole instance pipeline for a one-shot offscreen render.
-    const int64_t id = allocate_instance_id();
-    rt_init_instance(id, p_data, String(), String(), p_size);
-    if (instances.has(id)) {
-        rt_frame(id, 0.0);
-        rt_flush_all();
-        if (bridge != nullptr) {
+    // Self-contained one-shot render: own File import against the context
+    // factory, temporary RD texture, no Instance bookkeeping.
+    do {
+        if (!rt_ensure_bridge()) {
+            break;
+        }
+        rive::ImportResult import_result;
+        rive::rcp<rive::File> file = rive::File::import(
+            rive::Span<const uint8_t>(p_data.ptr(), p_data.size()),
+            bridge->factory(), &import_result);
+        if (file == nullptr) {
+            break;
+        }
+        std::unique_ptr<rive::ArtboardInstance> artboard =
+            file->artboardDefault();
+        if (artboard == nullptr) {
+            break;
+        }
+        std::unique_ptr<rive::StateMachineInstance> machine =
+            artboard->stateMachineCount() > 0 ? artboard->stateMachineAt(0)
+                                              : nullptr;
+        if (machine != nullptr) {
+            machine->advanceAndApply(0.0f);
+        } else {
+            artboard->advance(0.0f);
+        }
+
+        RenderingServer* rs = RenderingServer::get_singleton();
+        RenderingDevice* rd = rs->get_rendering_device();
+        RID rd_texture;
+        RID rs_texture;
+        uint64_t native_a = 0;
+        uint64_t native_b = 0;
+        const Vector2i size(MAX(1, p_size.x), MAX(1, p_size.y));
+        if (rd != nullptr) {
+            Ref<RDTextureFormat> format;
+            format.instantiate();
+            format->set_format(RenderingDevice::DATA_FORMAT_R8G8B8A8_UNORM);
+            format->set_width(size.x);
+            format->set_height(size.y);
+            format->set_usage_bits(
+                RenderingDevice::TEXTURE_USAGE_SAMPLING_BIT |
+                RenderingDevice::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT |
+                RenderingDevice::TEXTURE_USAGE_STORAGE_BIT |
+                RenderingDevice::TEXTURE_USAGE_CAN_COPY_FROM_BIT |
+                RenderingDevice::TEXTURE_USAGE_CAN_COPY_TO_BIT);
+            Ref<RDTextureView> view;
+            view.instantiate();
+            rd_texture = rd->texture_create(format, view);
+            if (!rd_texture.is_valid()) {
+                break;
+            }
+            rs_texture = rs->texture_rd_create(rd_texture);
+            native_a = rd->get_driver_resource(
+                RenderingDevice::DRIVER_RESOURCE_VULKAN_IMAGE, rd_texture, 0);
+            native_b = rd->get_driver_resource(
+                RenderingDevice::DRIVER_RESOURCE_VULKAN_IMAGE_VIEW,
+                rd_texture, 0);
+        } else {
+            Ref<Image> placeholder =
+                Image::create_empty(size.x, size.y, false, Image::FORMAT_RGBA8);
+            rs_texture = rs->texture_2d_create(placeholder);
+            if (!rs_texture.is_valid()) {
+                break;
+            }
+            native_a = rs->texture_get_native_handle(rs_texture);
+        }
+        rive::rcp<rive::gpu::RenderTarget> target =
+            bridge->wrap_render_target(size.x, size.y, native_a, native_b);
+
+        std::string error;
+        if (bridge->begin_batch(&error)) {
+            bridge->begin_frame(size.x, size.y, 0x00000000);
+            rive::RiveRenderer renderer(bridge->render_context());
+            renderer.save();
+            const ContainFit fit =
+                contain_fit(artboard->width(), artboard->height(),
+                            float(size.x), float(size.y));
+            renderer.transform(
+                rive::Mat2D(fit.scale, 0, 0, fit.scale, fit.tx, fit.ty));
+            artboard->draw(&renderer);
+            renderer.restore();
+            bridge->flush_target(target.get(), &error);
+            bridge->end_batch(&error);
             bridge->wait_idle();
+            result = rs->texture_2d_get(rs_texture);
         }
-        Instance* instance = instances[id];
-        if (instance->rs_texture.is_valid()) {
-            result = RenderingServer::get_singleton()->texture_2d_get(
-                instance->rs_texture);
+        if (rs_texture.is_valid()) {
+            rs->free_rid(rs_texture);
         }
-        rt_free_instance(id);
-    }
+        if (rd_texture.is_valid() && rd != nullptr) {
+            rd->free_rid(rd_texture);
+        }
+    } while (false);
     {
         std::lock_guard<std::mutex> lock(thumbnail_mutex);
         thumbnail_result = result;
@@ -1228,6 +1318,9 @@ void RiveRenderServer::rt_free_instance(int64_t p_instance_id) {
     }
     Instance* instance = *found;
     instances.erase(p_instance_id);
+    // The rive objects themselves are CommandServer-owned; the controller
+    // queues deleteStateMachine/deleteArtboard/deleteFile right after this
+    // closure, so they outlive our last use below.
     {
         std::lock_guard<std::mutex> lock(mailbox_mutex);
         texture_mailbox.erase(p_instance_id);

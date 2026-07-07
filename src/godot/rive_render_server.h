@@ -45,6 +45,15 @@ public:
     // Main thread: reserve an instance id.
     int64_t allocate_instance_id();
 
+    // The command queue: all instance mutations flow through its FIFO (M1);
+    // the server pumps it on the render thread each frame.
+    rive::CommandQueue* queue();
+
+    // Ensures a pump+flush runs this frame. frame_pre_draw normally drives
+    // it, but that signal never fires headless — writers call this after
+    // queueing (deduped by an atomic flag cleared in rt_flush_all).
+    void request_pump();
+
     // Main thread: RID mailboxes (filled by rt_init_instance).
     godot::RID get_texture_rid(int64_t p_instance_id);        // RD texture
     godot::RID get_canvas_texture_rid(int64_t p_instance_id); // RS texture
@@ -62,11 +71,11 @@ public:
 
     enum PointerPhase { POINTER_MOVE = 0, POINTER_DOWN, POINTER_UP, POINTER_EXIT };
 
-    // Render thread only.
-    void rt_init_instance(int64_t p_instance_id,
-                          const godot::PackedByteArray& p_data,
-                          const godot::String& p_artboard,
-                          const godot::String& p_state_machine,
+    // Render thread only (invoked through CommandQueue::runOnce closures).
+    // Handles were minted by queue lifecycle calls on the main thread.
+    void rt_init_instance(int64_t p_instance_id, uint64_t p_file_handle,
+                          uint64_t p_artboard_handle,
+                          uint64_t p_state_machine_handle,
                           const godot::Vector2i& p_size);
     void rt_frame(int64_t p_instance_id, double p_delta); // advance only
     // Renders every instance that needs it in one batch (one submission).
@@ -149,11 +158,13 @@ public:
 
     // Blocking render for editor thumbnails: safe to call from any
     // non-render thread (the editor's preview thread); posts a one-shot
-    // render to the render thread and waits (with timeout).
+    // self-contained render (own File import, no Instance) and waits.
     godot::Ref<godot::Image> render_thumbnail(
         const godot::PackedByteArray& p_data, const godot::Vector2i& p_size);
     void rt_render_thumbnail(const godot::PackedByteArray& p_data,
                              const godot::Vector2i& p_size);
+
+    void ensure_frame_hook(); // main/preview thread
 
 protected:
     static void _bind_methods();
@@ -188,6 +199,7 @@ private:
     godot::HashMap<int64_t, godot::Array> property_mailbox;
 
     std::atomic<int64_t> next_instance_id{1};
+    std::atomic<bool> pump_pending{false};
 
     // Created on the render thread at first instance init; read from the
     // audio thread via mix_audio. rive::AudioEngine is internally locked.
