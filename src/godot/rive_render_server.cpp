@@ -36,6 +36,8 @@
 #include "rive/event.hpp"
 #include "rive/event_report.hpp"
 #include "rive/input/focus_manager.hpp"
+#include "rive/semantic/semantic_manager.hpp"
+#include "rive/semantic/semantic_snapshot.hpp"
 #include "rive/file.hpp"
 #include "rive/math/mat2d.hpp"
 #include "rive/renderer/rive_renderer.hpp"
@@ -89,6 +91,7 @@ struct RiveRenderServer::Instance {
     // its last contents.
     bool needs_render = true;
     bool settled = false;
+    bool semantics_enabled = false;
     // Reports already delivered from the current report generation (rive
     // clears reports on advance; between advances they accumulate).
     size_t events_delivered = 0;
@@ -597,6 +600,7 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
 
         // Timeline events raised during this advance.
         rt_drain_reported_events(p_instance_id, instance);
+        rt_drain_semantics(p_instance_id, instance);
 
         // State transitions -> state_changed signal (animation states carry
         // the meaningful names; entry/exit/any states are skipped).
@@ -1273,6 +1277,108 @@ void RiveRenderServer::rt_list_set(int64_t p_instance_id, const String& p_path,
     }
     rive::rcp<rive::ViewModelInstanceRuntime> item = list->instanceAt(p_index);
     set_vm_value(item.get(), p_sub_path, p_value);
+}
+
+
+static const char* semantic_label(const rive::SemanticsDiffNode& node) {
+    return node.label.c_str();
+}
+
+void RiveRenderServer::rt_set_semantics_enabled(int64_t p_instance_id,
+                                                bool p_enabled) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr) {
+        return;
+    }
+    (*found)->semantics_enabled = p_enabled;
+    if (p_enabled && (*found)->state_machine != nullptr) {
+        // Builds the semantic tree (idempotent) — the manager is null
+        // until this runs.
+        (*found)->state_machine->enableSemantics();
+        if (auto* manager = (*found)->state_machine->semanticManager()) {
+            manager->markDirty(); // full re-emit for late enablers
+        }
+    }
+}
+
+void RiveRenderServer::rt_drain_semantics(int64_t p_instance_id,
+                                          Instance* p_instance) {
+    if (!p_instance->semantics_enabled ||
+        p_instance->state_machine == nullptr) {
+        return;
+    }
+    auto* manager = p_instance->state_machine->semanticManager();
+    if (manager == nullptr) {
+        return;
+    }
+    // drainDiff rebuilds if dirty and returns the delta (empty when
+    // nothing changed).
+    rive::SemanticsDiff diff = manager->drainDiff();
+    if (diff.empty()) {
+        return;
+    }
+    const FitTransform fit = compute_fit(
+        p_instance->fit, p_instance->align_x, p_instance->align_y,
+        p_instance->artboard->width(), p_instance->artboard->height(),
+        float(p_instance->size.x), float(p_instance->size.y),
+        p_instance->layout_scale);
+    Array changes;
+    auto push_node = [&](const rive::SemanticsDiffNode& node,
+                         const char* op) {
+        Dictionary d;
+        d["op"] = op;
+        d["id"] = int64_t(node.id);
+        d["parent"] = int64_t(node.parentId);
+        d["role"] = int(node.role);
+        d["label"] = String::utf8(semantic_label(node));
+        d["value"] = String::utf8(node.value.c_str());
+        d["bounds"] = Rect2(fit.sx * node.minX + fit.tx,
+                            fit.sy * node.minY + fit.ty,
+                            fit.sx * (node.maxX - node.minX),
+                            fit.sy * (node.maxY - node.minY));
+        changes.push_back(d);
+    };
+    for (const uint32_t removed : diff.removed) {
+        Dictionary d;
+        d["op"] = "removed";
+        d["id"] = int64_t(removed);
+        changes.push_back(d);
+    }
+    for (const auto& node : diff.added) {
+        push_node(node, "added");
+    }
+    for (const auto& node : diff.moved) {
+        push_node(node, "moved");
+    }
+    for (const auto& node : diff.updatedSemantic) {
+        push_node(node, "updated");
+    }
+    for (const auto& update : diff.updatedGeometry) {
+        Dictionary d;
+        d["op"] = "geometry";
+        d["id"] = int64_t(update.id);
+        d["bounds"] = Rect2(fit.sx * update.minX + fit.tx,
+                            fit.sy * update.minY + fit.ty,
+                            fit.sx * (update.maxX - update.minX),
+                            fit.sy * (update.maxY - update.minY));
+        changes.push_back(d);
+    }
+    std::lock_guard<std::mutex> lock(mailbox_mutex);
+    Array& box = semantics_mailbox[p_instance_id];
+    for (int i = 0; i < changes.size(); ++i) {
+        box.push_back(changes[i]);
+    }
+}
+
+Array RiveRenderServer::take_semantics(int64_t p_instance_id) {
+    std::lock_guard<std::mutex> lock(mailbox_mutex);
+    Array* found = semantics_mailbox.getptr(p_instance_id);
+    if (found == nullptr || found->is_empty()) {
+        return Array();
+    }
+    Array out = *found;
+    *found = Array();
+    return out;
 }
 
 bool RiveRenderServer::hit_test(int64_t p_instance_id,

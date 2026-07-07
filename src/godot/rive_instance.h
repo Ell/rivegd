@@ -68,6 +68,12 @@ public:
     godot::Variant get_property(const godot::String& p_path) const;
     godot::Array take_property_changes();
 
+    // Accessibility: enable semantics draining; changes arrive as node
+    // payload Dictionaries (texture-space bounds). Replayed on recreate.
+    void set_semantics_enabled(bool p_enabled);
+    godot::Array take_semantics();
+    bool semantics_enabled = false;
+
     // List properties. Structural ops are render-thread state and do not
     // survive instance rebuilds; watch the list path to observe its size.
     void list_append(const godot::String& p_path,

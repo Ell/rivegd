@@ -213,6 +213,17 @@ for a in rive_file.get_asset_descriptions():
 
 `resolved=false` after load means the sibling file was missing.
 
+### Accessibility (screen readers)
+
+Rive lets designers annotate artboards with semantics (roles, labels).
+`RiveControl.accessibility_enabled = true` mirrors that semantic tree into
+Godot's accessibility system (AccessKit) as live sub-elements — buttons,
+text, sliders inside your Rive UI become visible to screen readers, with
+bounds tracking the node's fit transform. No other game-engine Rive
+runtime exposes this today. (Elements publish when assistive technology is
+active; the semantic stream itself is inspectable via
+`get_semantics_node_count()`.)
+
 ### Fallback fonts
 
 When a Rive text run needs a glyph its authored font lacks (CJK,

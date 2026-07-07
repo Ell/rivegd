@@ -170,6 +170,12 @@ public:
     bool hit_test(int64_t p_instance_id, const godot::Vector2& p_local,
                   const godot::Vector2& p_node_size, bool p_default);
 
+    // Accessibility (G-a11y): enable per-instance semantics draining; each
+    // non-empty diff lands in the semantics mailbox as node payloads with
+    // TEXTURE-space bounds (the instance fit transform is pre-applied).
+    void rt_set_semantics_enabled(int64_t p_instance_id, bool p_enabled);
+    godot::Array take_semantics(int64_t p_instance_id);
+
     // Reads a list item's scalar and posts it to the property mailbox under
     // the synthetic path "<path>[<index>]/<sub_path>" (surfaced through
     // property_changed / get_property like any watched value).
@@ -205,6 +211,7 @@ private:
     void on_frame_pre_draw(); // main thread: posts rt_flush_all
     void rt_render_instance(int64_t p_instance_id, Instance* p_instance);
     void rt_drain_reported_events(int64_t p_instance_id, Instance* p_instance);
+    void rt_drain_semantics(int64_t p_instance_id, Instance* p_instance);
 
     bool rt_ensure_bridge();
 
@@ -226,6 +233,7 @@ private:
     // funnels through it post-M1) against synchronous main-thread reads
     // (hit_test). Coarse by design — reads are rare (opt-in hit testing).
     std::mutex flush_mutex;
+    godot::HashMap<int64_t, godot::Array> semantics_mailbox;
     godot::HashMap<int64_t, godot::RID> texture_mailbox;
     godot::HashMap<int64_t, godot::RID> canvas_texture_mailbox;
     godot::HashMap<int64_t, godot::Array> event_mailbox;

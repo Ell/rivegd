@@ -71,9 +71,11 @@ C++ runtime and need no integration surface — we inherit the C++ column's
   resource; N instances of one .riv decode once (hot reload retires the
   old generation).
 - Fallback Fonts: ✅ we now EXCEED Unity here (they're ❌ in the matrix) —
-  global registry via RiveFileResource.add_fallback_font. Semantics —
-  where CommandQueue's drainSemanticsDiff + Godot 4.7's AccessKit make an
-  accessibility bridge a first-mover opportunity for us (task #25).
+  global registry via RiveFileResource.add_fallback_font.
+- Semantics: ✅ we now EXCEED Unity here too (they're ❌) —
+  accessibility_enabled on RiveControl mirrors rive's semantic tree into
+  Godot's AccessKit as sub-elements (roles/labels/bounds; smoke-verified
+  4-button fixture). First game-engine Rive runtime with accessibility.
 - Unverified-by-fixture (believed working, runtime-core): N-slicing, RTL
   text — covered by task #17's MCP-authored fixtures.
 

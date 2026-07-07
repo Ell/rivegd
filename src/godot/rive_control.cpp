@@ -8,6 +8,7 @@
 #include <godot_cpp/classes/input_event_mouse_motion.hpp>
 #include <godot_cpp/classes/input_event_screen_drag.hpp>
 #include <godot_cpp/classes/input_event_screen_touch.hpp>
+#include <godot_cpp/classes/display_server.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/core/class_db.hpp>
 
@@ -93,6 +94,12 @@ void RiveControl::_bind_methods() {
                          &RiveControl::set_hit_test_behavior);
     ClassDB::bind_method(D_METHOD("get_hit_test_behavior"),
                          &RiveControl::get_hit_test_behavior);
+    ClassDB::bind_method(D_METHOD("set_accessibility_enabled", "enabled"),
+                         &RiveControl::set_accessibility_enabled);
+    ClassDB::bind_method(D_METHOD("get_accessibility_enabled"),
+                         &RiveControl::get_accessibility_enabled);
+    ClassDB::bind_method(D_METHOD("get_semantics_node_count"),
+                         &RiveControl::get_semantics_node_count);
     ClassDB::bind_method(D_METHOD("set_gamepad_enabled", "enabled"),
                          &RiveControl::set_gamepad_enabled);
     ClassDB::bind_method(D_METHOD("get_gamepad_enabled"),
@@ -139,6 +146,8 @@ void RiveControl::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::INT, "hit_test_behavior",
                               PROPERTY_HINT_ENUM, "Opaque,Translucent"),
                  "set_hit_test_behavior", "get_hit_test_behavior");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "accessibility_enabled"),
+                 "set_accessibility_enabled", "get_accessibility_enabled");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "speed_scale",
                               PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"),
                  "set_speed_scale", "get_speed_scale");
@@ -362,6 +371,89 @@ bool RiveControl::_has_point(const Vector2& p_point) const {
     return rive.hit_test(p_point, get_size(), true);
 }
 
+void RiveControl::set_accessibility_enabled(bool p_enabled) {
+    accessibility_enabled = p_enabled;
+    semantic_nodes.clear();
+    rive.set_semantics_enabled(p_enabled);
+}
+
+// rive SemanticRole -> DisplayServer::AccessibilityRole.
+static DisplayServer::AccessibilityRole semantics_role_to_godot(int p_role) {
+    switch (p_role) {
+        case 1: return DisplayServer::ROLE_BUTTON;
+        case 2: return DisplayServer::ROLE_LINK;
+        case 3: return DisplayServer::ROLE_CHECK_BOX;
+        case 4: return DisplayServer::ROLE_CHECK_BUTTON; // switch
+        case 5: return DisplayServer::ROLE_SLIDER;
+        case 6: return DisplayServer::ROLE_TEXT_FIELD;
+        case 7: return DisplayServer::ROLE_STATIC_TEXT;
+        case 8: return DisplayServer::ROLE_IMAGE;
+        case 9: return DisplayServer::ROLE_CONTAINER;
+        case 10: return DisplayServer::ROLE_LIST;
+        case 11: return DisplayServer::ROLE_LIST_ITEM;
+        case 12: return DisplayServer::ROLE_TAB;
+        default: return DisplayServer::ROLE_UNKNOWN;
+    }
+}
+
+void RiveControl::apply_semantics(const Array& p_changes) {
+    for (int i = 0; i < p_changes.size(); ++i) {
+        const Dictionary change = p_changes[i];
+        const String op = change["op"];
+        const int64_t id = change["id"];
+        if (op == String("removed")) {
+            SemanticNode* node = semantic_nodes.getptr(id);
+            if (node != nullptr && node->element.is_valid()) {
+                DisplayServer::get_singleton()->accessibility_free_element(
+                    node->element);
+            }
+            semantic_nodes.erase(id);
+            continue;
+        }
+        SemanticNode& node = semantic_nodes[id];
+        if (op == String("geometry")) {
+            node.bounds = change["bounds"];
+        } else { // added / moved / updated carry the full payload
+            node.role = change["role"];
+            node.label = change["label"];
+            node.value = change["value"];
+            node.bounds = change["bounds"];
+        }
+    }
+    semantics_layout_dirty = true;
+    queue_accessibility_update();
+}
+
+void RiveControl::publish_accessibility() {
+    // Runs inside the accessibility update pass (assistive tech active).
+    DisplayServer* display = DisplayServer::get_singleton();
+    const RID parent = get_accessibility_element();
+    if (!parent.is_valid()) {
+        return;
+    }
+    const Vector2 texture = Vector2(texture_size());
+    const Vector2 node_size = get_size();
+    const Vector2 scale(node_size.x / MAX(1.0f, texture.x),
+                        node_size.y / MAX(1.0f, texture.y));
+    for (KeyValue<int64_t, SemanticNode>& entry : semantic_nodes) {
+        SemanticNode& node = entry.value;
+        if (!node.element.is_valid()) {
+            node.element = display->accessibility_create_sub_element(
+                parent, semantics_role_to_godot(node.role));
+        }
+        display->accessibility_update_set_role(
+            node.element, semantics_role_to_godot(node.role));
+        display->accessibility_update_set_name(node.element, node.label);
+        if (!node.value.is_empty()) {
+            display->accessibility_update_set_value(node.element, node.value);
+        }
+        display->accessibility_update_set_bounds(
+            node.element,
+            Rect2(node.bounds.position * scale, node.bounds.size * scale));
+    }
+    semantics_layout_dirty = false;
+}
+
 void RiveControl::set_gamepad_enabled(bool p_enabled) {
     gamepad_enabled = p_enabled;
 }
@@ -530,6 +622,11 @@ PackedStringArray RiveControl::_get_configuration_warnings() const {
 
 void RiveControl::_notification(int p_what) {
     switch (p_what) {
+        case NOTIFICATION_ACCESSIBILITY_UPDATE: {
+            if (accessibility_enabled) {
+                publish_accessibility();
+            }
+        } break;
         case NOTIFICATION_ENTER_TREE: {
             recreate_instance();
         } break;
@@ -580,6 +677,12 @@ void RiveControl::_notification(int p_what) {
             Array states = rive.take_state_changes();
             for (int i = 0; i < states.size(); ++i) {
                 emit_signal("state_changed", states[i]);
+            }
+            if (accessibility_enabled) {
+                const Array semantic_changes = rive.take_semantics();
+                if (!semantic_changes.is_empty()) {
+                    apply_semantics(semantic_changes);
+                }
             }
             Array changes = rive.take_property_changes();
             for (int i = 0; i < changes.size(); ++i) {

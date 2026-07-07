@@ -91,6 +91,17 @@ public:
 
     bool _has_point(const godot::Vector2& p_point) const override;
 
+    // Mirrors the artboard's authored semantics (roles, labels, bounds)
+    // into Godot's accessibility tree (AccessKit) as sub-elements of this
+    // control — screen readers see Rive UI. First game-engine Rive runtime
+    // with this. Elements publish during accessibility updates (i.e., when
+    // assistive tech is active); the semantics stream itself always flows
+    // when enabled.
+    void set_accessibility_enabled(bool p_enabled);
+    bool get_accessibility_enabled() const { return accessibility_enabled; }
+    // Debug/testing: semantic nodes currently mirrored.
+    int get_semantics_node_count() const { return semantic_nodes.size(); }
+
     void set_gamepad_enabled(bool p_enabled);
     bool get_gamepad_enabled() const { return gamepad_enabled; }
     // Power-user/testing entry: submit a raw rive gamepad batch (wire v2).
@@ -140,6 +151,18 @@ private:
     void update_audio_player();
     RiveGamepadEncoder gamepad_encoder;
     int hit_test_behavior = 0;
+    bool accessibility_enabled = false;
+    struct SemanticNode {
+        int role = 0;
+        godot::String label;
+        godot::String value;
+        godot::Rect2 bounds; // texture space
+        godot::RID element;  // valid only after an accessibility pass
+    };
+    godot::HashMap<int64_t, SemanticNode> semantic_nodes;
+    bool semantics_layout_dirty = false;
+    void apply_semantics(const godot::Array& p_changes);
+    void publish_accessibility();
     bool gamepad_enabled = false;
     bool playing = true;
     bool pause_when_hidden = true;

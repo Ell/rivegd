@@ -112,6 +112,9 @@ void RiveInstance::create(const Vector2i& p_size) {
     for (const KeyValue<String, bool>& entry : watched_paths) {
         post_watch(entry.key);
     }
+    if (semantics_enabled) {
+        RIVEGD_POST(rt_set_semantics_enabled, true);
+    }
     texture_bound = false;
 }
 
@@ -270,6 +273,18 @@ Array RiveInstance::take_property_changes() {
 }
 
 
+
+void RiveInstance::set_semantics_enabled(bool p_enabled) {
+    semantics_enabled = p_enabled;
+    RIVEGD_POST(rt_set_semantics_enabled, p_enabled);
+}
+
+Array RiveInstance::take_semantics() {
+    if (instance_id == 0) {
+        return Array();
+    }
+    return RiveRenderServer::get_singleton()->take_semantics(instance_id);
+}
 
 bool RiveInstance::hit_test(const Vector2& p_local,
                             const Vector2& p_node_size,
