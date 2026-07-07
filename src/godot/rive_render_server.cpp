@@ -23,6 +23,7 @@
 #include "rive/viewmodel/runtime/viewmodel_instance_value_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_runtime.hpp"
 #include "rive/viewmodel/viewmodel_instance.hpp"
+#include "utils/no_op_factory.hpp"
 
 #include <godot_cpp/templates/local_vector.hpp>
 
@@ -254,8 +255,12 @@ bool RiveRenderServer::rt_ensure_bridge() {
             return true;
         }
         bridge_failed = true;
-        ERR_PRINT("rivegd: no RenderingDevice and driver '" + driver +
-                  "' is unsupported; Rive rendering is unavailable.");
+        if (driver.is_empty() || driver == "dummy") {
+            print_verbose("rivegd: headless — running logic-only.");
+        } else {
+            ERR_PRINT("rivegd: no RenderingDevice and driver '" + driver +
+                      "' is unsupported; Rive runs logic-only.");
+        }
         return false;
     }
     render::GodotVulkanHandles handles;
@@ -286,9 +291,11 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
                                         const String& p_artboard,
                                         const String& p_state_machine,
                                         const Vector2i& p_size) {
-    if (!rt_ensure_bridge()) {
-        return;
-    }
+    // Without a GPU bridge (headless / unsupported driver) instances still
+    // run logic-only: state machines, inputs, events, data binding — no
+    // rendering (GOALS G2.4).
+    const bool has_bridge = rt_ensure_bridge();
+    static rive::NoOpFactory logic_only_factory;
 
     Instance* instance = memnew(Instance);
     instance->size = Vector2i(MAX(1, p_size.x), MAX(1, p_size.y));
@@ -298,7 +305,8 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
     rive::ImportResult result;
     instance->file =
         rive::File::import(rive::Span<const uint8_t>(p_data.ptr(), p_data.size()),
-                           bridge->factory(), &result);
+                           has_bridge ? bridge->factory() : &logic_only_factory,
+                           &result);
     if (instance->file == nullptr) {
         ERR_PRINT("rivegd: .riv import failed on render context");
         memdelete(instance);
@@ -348,10 +356,12 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
     // RS wrapper (texture_rd_create). GL path: an RS texture whose GL id we
     // render into directly.
     RenderingServer* rs = RenderingServer::get_singleton();
-    RenderingDevice* rd = rs->get_rendering_device();
+    RenderingDevice* rd = has_bridge ? rs->get_rendering_device() : nullptr;
     uint64_t native_a = 0;
     uint64_t native_b = 0;
-    if (rd != nullptr) {
+    if (!has_bridge) {
+        // Logic-only: no texture, no render target.
+    } else if (rd != nullptr) {
         Ref<RDTextureFormat> format;
         format.instantiate();
         format->set_format(RenderingDevice::DATA_FORMAT_R8G8B8A8_UNORM);
@@ -389,8 +399,10 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
         }
         native_a = rs->texture_get_native_handle(instance->rs_texture);
     }
-    instance->target = bridge->wrap_render_target(
-        instance->size.x, instance->size.y, native_a, native_b);
+    if (has_bridge) {
+        instance->target = bridge->wrap_render_target(
+            instance->size.x, instance->size.y, native_a, native_b);
+    }
 
     // Route this artboard's audio events through the shared external
     // engine (mixed into Godot's audio server via RiveAudioStream).
@@ -574,7 +586,8 @@ void RiveRenderServer::rt_flush_all() {
     }
     for (const KeyValue<int64_t, Instance*>& entry : instances) {
         Instance* instance = entry.value;
-        if (!instance->valid || !instance->needs_render) {
+        if (!instance->valid || !instance->needs_render ||
+            instance->target == nullptr) {
             continue;
         }
         instance->needs_render = false;

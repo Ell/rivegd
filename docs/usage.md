@@ -15,6 +15,9 @@ and [`ux-design.md`](ux-design.md).
   and state machines advance, nothing draws.
 - Prebuilt binaries: Linux x86_64 only so far (CI artifacts). Other desktop
   platforms build from source (below).
+- **C# works** — same API via ClassDB (`obj.Call("set_property", ...)`,
+  signals into `Callable.From`); verified headless in CI
+  (`tests/csharp/CsSmoke.cs` is the example).
 - Data binding: typed writes, watch-based reads, and per-path change
   signals (GOALS G4.4).
 

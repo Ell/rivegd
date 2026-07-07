@@ -41,6 +41,16 @@ jobs:
       - name: Build GDExtension (stage 2)
         run: scons -j$(nproc)
 
+      - name: C# smoke (mono build, headless logic-only)
+        run: |
+          curl -sfLO https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_mono_linux_x86_64.zip
+          unzip -q Godot_v4.7-stable_mono_linux_x86_64.zip
+          cd tests/csharp
+          dotnet build
+          ../../Godot_v4.7-stable_mono_linux_x86_64/Godot_v4.7-stable_mono_linux.x86_64 --headless --path . --import || true
+          ../../Godot_v4.7-stable_mono_linux_x86_64/Godot_v4.7-stable_mono_linux.x86_64 --headless --path . --script CsSmoke.cs 2>&1 | tee /tmp/cs.log
+          grep -q "CSHARP SMOKE OK" /tmp/cs.log
+
       - name: Godot headless smoke
         run: |
           curl -sfLO https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
