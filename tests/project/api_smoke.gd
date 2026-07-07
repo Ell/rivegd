@@ -139,8 +139,42 @@ func _process(_delta: float) -> void:
 		if image_a.get_data() == image_b.get_data():
 			fail("RiveTexture is not animating inside a TextureRect")
 			return
+		_start_property_phase()
+	elif frames == 350:
+		# Baseline value must have been reported by the initial watch.
+		if property_changes.is_empty():
+			fail("no baseline property_changed for watched 'width'")
+			return
+		if not is_equal_approx(float(vm_sprite.get_property("width")), 100.0):
+			fail("baseline get_property('width') = %s, expected 100" %
+					[vm_sprite.get_property("width")])
+			return
+		vm_sprite.set_property("width", 42.0)
+	elif frames == 380:
+		if not is_equal_approx(float(vm_sprite.get_property("width")), 42.0):
+			fail("get_property('width') = %s, expected 42 after set" %
+					[vm_sprite.get_property("width")])
+			return
+		print("property changes: ", property_changes)
 		print("API SMOKE OK")
 		get_tree().quit(0)
+
+
+var vm_sprite: RiveSprite2D
+var property_changes: Array = []
+
+
+func _start_property_phase() -> void:
+	# Data-binding reads: watch a property, write it, observe the change
+	# signal and the cached read (data_binding_test.riv: 'width' drives
+	# bound_rect, starts at 100).
+	vm_sprite = RiveSprite2D.new()
+	vm_sprite.file = load("res://fixtures/data_binding_test.riv")
+	vm_sprite.artboard = "artboard-1"
+	add_child(vm_sprite)
+	vm_sprite.property_changed.connect(func(path, value):
+		property_changes.push_back([path, value]))
+	vm_sprite.watch_property("width")
 
 
 func _start_texture_phase() -> void:

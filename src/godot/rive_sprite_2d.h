@@ -35,6 +35,8 @@ public:
 
     void set_property(const godot::String& p_path, const godot::Variant& p_value);
     void fire_property_trigger(const godot::String& p_path);
+    void watch_property(const godot::String& p_path);
+    godot::Variant get_property(const godot::String& p_path) const;
 
     godot::PackedStringArray _get_configuration_warnings() const override;
     void _notification(int p_what);

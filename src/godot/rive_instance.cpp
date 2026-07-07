@@ -35,6 +35,9 @@ void RiveInstance::create(const Vector2i& p_size) {
     for (const KeyValue<String, Variant>& entry : property_values) {
         post_property(entry.key, entry.value);
     }
+    for (const KeyValue<String, bool>& entry : watched_paths) {
+        post_watch(entry.key);
+    }
     texture_bound = false;
 }
 
@@ -132,6 +135,43 @@ void RiveInstance::post_property(const String& p_path, const Variant& p_value) {
 void RiveInstance::set_property(const String& p_path, const Variant& p_value) {
     property_values[p_path] = p_value;
     post_property(p_path, p_value);
+}
+
+void RiveInstance::post_watch(const String& p_path) {
+    RiveRenderServer* server = RiveRenderServer::get_singleton();
+    if (server == nullptr || instance_id == 0) {
+        return;
+    }
+    RenderingServer::get_singleton()->call_on_render_thread(
+        callable_mp(server, &RiveRenderServer::rt_watch_vm_property)
+            .bind(instance_id, p_path));
+}
+
+void RiveInstance::watch_property(const String& p_path) {
+    watched_paths[p_path] = true;
+    post_watch(p_path);
+}
+
+Variant RiveInstance::get_property(const String& p_path) const {
+    const Variant* cached = property_cache.getptr(p_path);
+    if (cached != nullptr) {
+        return *cached;
+    }
+    const Variant* set_value = property_values.getptr(p_path);
+    return set_value != nullptr ? *set_value : Variant();
+}
+
+Array RiveInstance::take_property_changes() {
+    if (instance_id == 0) {
+        return Array();
+    }
+    Array changes =
+        RiveRenderServer::get_singleton()->take_property_changes(instance_id);
+    for (int i = 0; i < changes.size(); ++i) {
+        Dictionary change = changes[i];
+        property_cache[change["path"]] = change["value"];
+    }
+    return changes;
 }
 
 void RiveInstance::fire_property_trigger(const String& p_path) {

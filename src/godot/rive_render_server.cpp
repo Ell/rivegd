@@ -13,7 +13,10 @@
 #include "rive/viewmodel/runtime/viewmodel_instance_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_string_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_trigger_runtime.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_value_runtime.hpp"
 #include "rive/viewmodel/viewmodel_instance.hpp"
+
+#include <godot_cpp/templates/local_vector.hpp>
 #include "rive/custom_property_boolean.hpp"
 #include "rive/custom_property_number.hpp"
 #include "rive/custom_property_string.hpp"
@@ -45,7 +48,33 @@ struct RiveRenderServer::Instance {
     RID rd_texture;
     Vector2i size;
     bool valid = false;
+
+    struct WatchedProperty {
+        String path;
+        rive::ViewModelInstanceValueRuntime* value = nullptr; // owned by VM
+    };
+    LocalVector<WatchedProperty> watched;
 };
+
+// Reads a watched property's current value as a Variant. Dispatch is by
+// DataType — rive builds without RTTI, so no dynamic_cast.
+static Variant read_vm_property(rive::ViewModelInstanceValueRuntime* value) {
+    switch (value->dataType()) {
+        case rive::DataType::boolean:
+            return static_cast<rive::ViewModelInstanceBooleanRuntime*>(value)
+                ->value();
+        case rive::DataType::number:
+            return static_cast<rive::ViewModelInstanceNumberRuntime*>(value)
+                ->value();
+        case rive::DataType::string:
+            return String::utf8(
+                static_cast<rive::ViewModelInstanceStringRuntime*>(value)
+                    ->value()
+                    .c_str());
+        default:
+            return Variant();
+    }
+}
 
 RiveRenderServer::RiveRenderServer() = default;
 RiveRenderServer::~RiveRenderServer() = default;
@@ -105,6 +134,17 @@ Array RiveRenderServer::take_state_changes(int64_t p_instance_id) {
     }
     Array out = *states;
     *states = Array();
+    return out;
+}
+
+Array RiveRenderServer::take_property_changes(int64_t p_instance_id) {
+    std::lock_guard<std::mutex> lock(mailbox_mutex);
+    Array* changes = property_mailbox.getptr(p_instance_id);
+    if (changes == nullptr || changes->is_empty()) {
+        return Array();
+    }
+    Array out = *changes;
+    *changes = Array();
     return out;
 }
 
@@ -197,10 +237,14 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
         instance->state_machine = instance->artboard->stateMachineAt(0);
     }
 
-    // Data binding: bind the file's default view model instance when the
-    // artboard declares one (no-op otherwise).
+    // Data binding: bind the artboard's default view model instance when it
+    // declares one; otherwise fall back to a fresh instance of the
+    // artboard's view model (no-op when the artboard has no view model).
     rive::rcp<rive::ViewModelInstance> vmi =
         instance->file->createDefaultViewModelInstance(instance->artboard.get());
+    if (vmi == nullptr) {
+        vmi = instance->file->createViewModelInstance(instance->artboard.get());
+    }
     if (vmi != nullptr) {
         if (instance->state_machine != nullptr) {
             instance->state_machine->bindViewModelInstance(vmi);
@@ -324,6 +368,24 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
         }
     } else {
         instance->artboard->advance(static_cast<float>(p_delta));
+    }
+
+    // Watched view-model properties -> property_changed signal.
+    if (!instance->watched.is_empty()) {
+        Array changes;
+        for (const Instance::WatchedProperty& watched : instance->watched) {
+            if (watched.value->flushChanges()) {
+                Dictionary change;
+                change["path"] = watched.path;
+                change["value"] = read_vm_property(watched.value);
+                changes.push_back(change);
+            }
+        }
+        if (!changes.is_empty()) {
+            std::lock_guard<std::mutex> lock(mailbox_mutex);
+            Array& mailbox = property_mailbox[p_instance_id];
+            mailbox.append_array(changes);
+        }
     }
 
     bridge->begin_frame(instance->size.x, instance->size.y, 0x00000000);
@@ -488,6 +550,48 @@ void RiveRenderServer::rt_fire_vm_trigger(int64_t p_instance_id,
     }
 }
 
+void RiveRenderServer::rt_watch_vm_property(int64_t p_instance_id,
+                                            const String& p_path) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr) {
+        return;
+    }
+    if ((*found)->view_model == nullptr) {
+        ERR_PRINT("rivegd: cannot watch '" + p_path +
+                  "': this artboard has no view model bound");
+        return;
+    }
+    Instance* instance = *found;
+    for (const Instance::WatchedProperty& watched : instance->watched) {
+        if (watched.path == p_path) {
+            return; // already watched
+        }
+    }
+
+    const std::string path = p_path.utf8().get_data();
+    rive::ViewModelInstanceValueRuntime* value =
+        instance->view_model->propertyBoolean(path);
+    if (value == nullptr) {
+        value = instance->view_model->propertyNumber(path);
+    }
+    if (value == nullptr) {
+        value = instance->view_model->propertyString(path);
+    }
+    if (value == nullptr) {
+        ERR_PRINT("rivegd: cannot watch view-model property '" + p_path +
+                  "' (not found or unsupported type)");
+        return;
+    }
+    instance->watched.push_back({p_path, value});
+
+    // Report the current value immediately so get_property has a baseline.
+    Dictionary change;
+    change["path"] = p_path;
+    change["value"] = read_vm_property(value);
+    std::lock_guard<std::mutex> lock(mailbox_mutex);
+    property_mailbox[p_instance_id].push_back(change);
+}
+
 void RiveRenderServer::rt_free_instance(int64_t p_instance_id) {
     Instance** found = instances.getptr(p_instance_id);
     if (found == nullptr) {
@@ -500,6 +604,7 @@ void RiveRenderServer::rt_free_instance(int64_t p_instance_id) {
         texture_mailbox.erase(p_instance_id);
         event_mailbox.erase(p_instance_id);
         state_mailbox.erase(p_instance_id);
+        property_mailbox.erase(p_instance_id);
     }
     if (bridge != nullptr) {
         // GPU may still be reading the target from the last flush.

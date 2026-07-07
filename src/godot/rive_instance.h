@@ -43,6 +43,13 @@ public:
     // (bool/int/float/String/Color dispatched by Variant type).
     void set_property(const godot::String& p_path, const godot::Variant& p_value);
     void fire_property_trigger(const godot::String& p_path);
+
+    // Data binding reads: watch a property (change reports flow through
+    // take_property_changes; the current value is reported immediately).
+    // get_property returns the last value seen on the main thread.
+    void watch_property(const godot::String& p_path);
+    godot::Variant get_property(const godot::String& p_path) const;
+    godot::Array take_property_changes();
     void pointer(int p_phase, const godot::Vector2& p_local,
                  const godot::Vector2& p_node_size);
 
@@ -60,10 +67,14 @@ private:
     bool texture_bound = false;
     void post_property(const godot::String& p_path,
                        const godot::Variant& p_value);
+    void post_watch(const godot::String& p_path);
 
     // Inspector/script-set values, replayed whenever the instance recreates.
     godot::HashMap<godot::String, godot::Variant> input_values;
     godot::HashMap<godot::String, godot::Variant> property_values;
+    // Watched paths (replayed on recreate) and last values seen.
+    godot::HashMap<godot::String, bool> watched_paths;
+    godot::HashMap<godot::String, godot::Variant> property_cache;
 };
 
 } // namespace rivegd

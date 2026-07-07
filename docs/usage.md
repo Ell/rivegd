@@ -13,8 +13,8 @@ and [`ux-design.md`](ux-design.md).
   nothing renders.
 - Prebuilt binaries: Linux x86_64 only so far (CI artifacts). Other desktop
   platforms build from source (below).
-- Data binding is **write-path only** so far: `set_property` works; reads
-  and per-path change signals are on the roadmap (GOALS G4.4).
+- Data binding: typed writes, watch-based reads, and per-path change
+  signals (GOALS G4.4).
 
 ## Install
 

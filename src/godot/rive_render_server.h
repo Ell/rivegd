@@ -50,6 +50,10 @@ public:
     // Main thread: drain state-change notifications (Array of state names).
     godot::Array take_state_changes(int64_t p_instance_id);
 
+    // Main thread: drain watched view-model property changes (Array of
+    // { path, value } Dictionaries).
+    godot::Array take_property_changes(int64_t p_instance_id);
+
     enum PointerPhase { POINTER_MOVE = 0, POINTER_DOWN, POINTER_UP, POINTER_EXIT };
 
     // Render thread only.
@@ -83,6 +87,11 @@ public:
                          const godot::Color& p_value);
     void rt_fire_vm_trigger(int64_t p_instance_id, const godot::String& p_path);
 
+    // Start reporting changes of a view-model property through
+    // take_property_changes (its current value is reported immediately).
+    void rt_watch_vm_property(int64_t p_instance_id,
+                              const godot::String& p_path);
+
 protected:
     static void _bind_methods();
 
@@ -101,6 +110,7 @@ private:
     godot::HashMap<int64_t, godot::RID> texture_mailbox;
     godot::HashMap<int64_t, godot::Array> event_mailbox;
     godot::HashMap<int64_t, godot::Array> state_mailbox;
+    godot::HashMap<int64_t, godot::Array> property_mailbox;
 
     std::atomic<int64_t> next_instance_id{1};
 };

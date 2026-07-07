@@ -37,6 +37,10 @@ void RiveControl::_bind_methods() {
                          &RiveControl::set_property);
     ClassDB::bind_method(D_METHOD("fire_property_trigger", "path"),
                          &RiveControl::fire_property_trigger);
+    ClassDB::bind_method(D_METHOD("watch_property", "path"),
+                         &RiveControl::watch_property);
+    ClassDB::bind_method(D_METHOD("get_property", "path"),
+                         &RiveControl::get_property);
 
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "file",
                               PROPERTY_HINT_RESOURCE_TYPE, "RiveFileResource"),
@@ -56,6 +60,9 @@ void RiveControl::_bind_methods() {
                           PropertyInfo(Variant::DICTIONARY, "properties")));
     ADD_SIGNAL(MethodInfo("state_changed",
                           PropertyInfo(Variant::STRING, "state_name")));
+    ADD_SIGNAL(MethodInfo("property_changed",
+                          PropertyInfo(Variant::STRING, "path"),
+                          PropertyInfo(Variant::NIL, "value")));
 }
 
 void RiveControl::set_file(const Ref<RiveFileResource>& p_file) {
@@ -116,6 +123,14 @@ void RiveControl::set_property(const String& p_path, const Variant& p_value) {
 
 void RiveControl::fire_property_trigger(const String& p_path) {
     rive.fire_property_trigger(p_path);
+}
+
+void RiveControl::watch_property(const String& p_path) {
+    rive.watch_property(p_path);
+}
+
+Variant RiveControl::get_property(const String& p_path) const {
+    return rive.get_property(p_path);
 }
 
 Vector2 RiveControl::_get_minimum_size() const {
@@ -223,6 +238,12 @@ void RiveControl::_notification(int p_what) {
             Array states = rive.take_state_changes();
             for (int i = 0; i < states.size(); ++i) {
                 emit_signal("state_changed", states[i]);
+            }
+            Array changes = rive.take_property_changes();
+            for (int i = 0; i < changes.size(); ++i) {
+                Dictionary change = changes[i];
+                emit_signal("property_changed", change["path"],
+                            change["value"]);
             }
         } break;
         case NOTIFICATION_DRAW: {
