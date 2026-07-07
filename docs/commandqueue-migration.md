@@ -32,18 +32,34 @@ change at any milestone.
 
 ## Milestones
 
-- **M0 (this branch, done)**: queue + server instantiated and pumped each
-  frame alongside the existing code. No behavior change; proves the pump
-  placement and lifetime around bridge init/teardown.
-- **M1**: file/artboard/state-machine lifecycle through queue handles
-  (`loadFile`, `instantiateArtboardNamed`, `instantiateStateMachineNamed`,
-  `advanceStateMachine`, `pointer*`); `Instance` keeps only handles + RIDs +
-  target; rendering resolves instances via server getters inside
-  `rt_flush_all`. Inputs/VM writes stay as `runOnce` closures.
+- **M0 (done)**: queue + server instantiated and pumped each frame
+  alongside the existing code. No behavior change; proved pump placement.
+- **M1 (done, PR #1)**: lifecycle through handles; all mutations as runOnce
+  closures; request_pump() for headless; self-contained thumbnails. Found:
+  the server's Factory is fixed at construction (bridge must exist first or
+  everything imports render-nothing NoOp paths); queue "" state-machine
+  name means designated-default, not first-machine; render smoke needed a
+  content assertion. Cost: ~22µs/instance/frame runOnce overhead
+  (9.12→10.23ms on the 50-artboard bench).
 - **M2**: data binding onto queue-native VM APIs + property subscriptions
   (listeners replace the property mailbox); events/settled via listeners
   (replace event/state mailboxes; settled listener replaces our
   `advanceAndApply` return-value sleeping).
+
+  Mechanics (verified against the header): messages flow server→client and
+  fire listener callbacks **only when the client calls
+  `CommandQueue::processMessages()`** — on whichever thread calls it. Plan:
+  pump messages once per frame on the **main thread**, from the same
+  request-driven tick pattern as `request_pump()` (frame_pre_draw does not
+  fire headless — reuse the dedup-flag approach, pumping in a deferred main
+  thread callable). Listeners: one server-owned global
+  `FileListener`/`StateMachineListener`/VM listener set
+  (`setGlobal*Listener`), dispatching by handle→instance-id to the nodes'
+  existing signal surface. Listener callbacks then EMIT directly (no
+  mailboxes, no mutexes). The ordering suite (O1–O4) is the acceptance
+  gate: rive must deliver events in report order and subscriptions in a
+  deterministic order, or M2 keeps the mailboxes for whichever channel
+  fails.
 - **M3**: drop the bespoke rt_* closures that M1/M2 obsoleted; delete the
   mailbox mutex paths that listeners replaced.
 - **M4 (optional, measured)**: move the server pump to a dedicated thread;
