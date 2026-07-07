@@ -1,7 +1,7 @@
 # Using rivegd
 
 Rive playback for Godot **4.7+** as a GDExtension. This guide covers today's
-API (Phase 2a). For where the project is heading, see [`GOALS.md`](../GOALS.md)
+API (Phase 2b). For where the project is heading, see [`GOALS.md`](../GOALS.md)
 and [`ux-design.md`](ux-design.md).
 
 ## Current requirements & limitations
@@ -13,8 +13,8 @@ and [`ux-design.md`](ux-design.md).
   nothing renders.
 - Prebuilt binaries: Linux x86_64 only so far (CI artifacts). Other desktop
   platforms build from source (below).
-- Data binding (view models), editor preview panels, and trigger buttons in
-  the inspector are Phase 2b — not in yet.
+- Data binding is **write-path only** so far: `set_property` works; reads
+  and per-path change signals are on the roadmap (GOALS G4.4).
 
 ## Install
 
@@ -116,7 +116,8 @@ re-applied by name.
 git clone --recurse-submodules https://github.com/Ell/rivegd
 cd rivegd
 
-# Stage 1: rive-runtime static libs (needs clang, ninja, uuid-dev)
+# Stage 1: rive-runtime static libs (needs clang, ninja, uuid-dev,
+#          glslang-tools, libvulkan-dev)
 tools/build_rive.sh
 
 # Stage 2: the GDExtension (needs scons; use a venv if not installed)
