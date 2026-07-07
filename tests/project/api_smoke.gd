@@ -248,6 +248,17 @@ func _process(_delta: float) -> void:
 			return
 		print("audio peak observed: ", audio_peak)
 		_start_gamepad_phase()
+	elif frames == 810:
+		# Scripting (G5.4): a script-bearing file must load, instance, and
+		# advance without errors. (Sample-signed fixture scripts are
+		# rejected by the production key — behavior asserts come from a
+		# dev-key CI variant later.)
+		var scripted := RiveSprite2D.new()
+		scripted.file = load("res://fixtures/scripted_enum.riv")
+		add_child(scripted)
+		if not scripted.file.is_valid():
+			fail("scripted_enum.riv failed to load")
+			return
 	elif frames == 840:
 		# Hard assertion: the hand-built batch must be ACCEPTED by rive's
 		# parser (a malformed batch prints "malformed gamepad batch").

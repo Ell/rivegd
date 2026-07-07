@@ -62,7 +62,7 @@ Design rationale and evidence live in [`docs/implementation-strategy.md`](docs/i
 - **G5.1** Text: Rive's HarfBuzz/SheenBidi engine (`WITH_RIVE_TEXT`), symbol-renamed to coexist with Godot's own HarfBuzz; data-bound strings preferred, legacy text runs supported; plays well with `tr()` and translation remaps.
 - **G5.2** Layout: `WITH_RIVE_LAYOUT` (Yoga) — responsive artboards resize with Control layout.
 - **G5.3** Audio: external-audio-engine mode; Rive audio routes through Godot's audio server via `RiveAudioStream` on any `AudioStreamPlayer`/bus. ✅ (shared engine; per-node bus routing later)
-- **G5.4** Luau scripting in `.riv` files (`WITH_RIVE_SCRIPTING`): scripted drawables/path effects/interpolators/data converters just work — sandboxed in Rive's VM, signature-verified (never the test keypair), disableable via project setting. Luau is inside-the-artboard behavior; GDScript/C# is game logic; data binding + events are the handoff.
+- **G5.4** Luau scripting in `.riv` files (`WITH_RIVE_SCRIPTING`): scripted drawables/path effects/interpolators/data converters just work — sandboxed in Rive's VM, signature-verified (never the test keypair). ✅ enabled (graceful-degrade tested; behavioral coverage needs a dev-key CI variant or an editor-signed fixture — tracked; project-setting kill-switch pending). Luau is inside-the-artboard behavior; GDScript/C# is game logic; data binding + events are the handoff.
 - **G5.5** Events with custom properties surface as Dictionaries; audio events surface distinctly.
 
 ## G6. Build, distribution, sustainability

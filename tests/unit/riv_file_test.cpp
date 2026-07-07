@@ -132,6 +132,16 @@ TEST_CASE("enum view model properties carry their option lists") {
     REQUIRE(found_trigger);
 }
 
+TEST_CASE("script-bearing files import cleanly (G5.4)") {
+    // Production-key build: rive's sample-signed fixture scripts are
+    // rejected by signature verification, but the file must import and its
+    // metadata must enumerate — graceful degradation, never a crash.
+    auto bytes = read_file(FIXTURE("scripted_enum.riv"));
+    auto file = rivegd::core::RivFile::import(bytes.data(), bytes.size());
+    REQUIRE(file != nullptr);
+    REQUIRE(!file->artboards().empty());
+}
+
 TEST_CASE("headless advance: instance a state machine and run it") {
     auto bytes = read_file(FIXTURE("bullet_man.riv"));
     auto file = rivegd::core::RivFile::import(bytes.data(), bytes.size());

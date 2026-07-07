@@ -28,7 +28,10 @@ cd "$ROOT/thirdparty/rive-runtime/renderer"
 # --with_vulkan: enables the Vulkan RenderContext backend (Phase 1).
 # --with_rive_audio=external: miniaudio mixes but owns no OS device;
 # Godot's audio server pulls PCM through RiveAudioStream.
+# --with_rive_scripting: Luau VM for script-bearing .riv files (G5.4).
+# Scripts are signature-verified against rive's PRODUCTION key; rive's
+# sample-signed test fixtures will load but their scripts won't run.
 exec ../build/build_rive.sh ninja "$CONFIG" --no-lto --with-pic --with_vulkan \
-    --with_rive_audio=external -- \
+    --with_rive_audio=external --with_rive_scripting -- \
     rive rive_pls_renderer rive_decoders rive_harfbuzz rive_sheenbidi \
-    rive_yoga miniaudio libpng libjpeg libwebp zlib
+    rive_yoga miniaudio luau_vm libpng libjpeg libwebp zlib

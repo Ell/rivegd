@@ -21,11 +21,15 @@ $RiveControl.rive_event.connect(func(name, props): print(name, props))
 | Events | `rive_event(name, properties)` with custom properties |
 | Data binding | **every** VM type: number/bool/string/color/enum (inspector dropdowns)/trigger/list/image/artboard/nested — writes, watch-based reads, `property_changed` |
 | Text | Rive's HarfBuzz/SheenBidi engine (symbol-renamed; coexists with Godot's) |
+| Scripting | Luau VM compiled in — editor-signed script-bearing files run; unsigned scripts rejected gracefully |
+| Audio | Rive audio events through Godot's mixer via `RiveAudioStream` |
+| C# | full API via ClassDB, verified headless in CI |
+| Input | mouse/pointer listeners, keyboard+focus, gamepad batching |
 | Perf | settled state machines sleep; `pause_when_hidden`; 50 artboards ≈ 9.1 ms avg on an RTX 4090 (`tests/project/bench.tscn`) |
 | Editor | in-editor class reference (F1), configuration warnings, demo project |
 | CI | GitHub Actions + GitLab CI: build, 41-assertion unit suite, headless smoke |
 
-**Not yet:** macOS/iOS (Metal), D3D12, Android, web; desktop Compatibility cannot render (Godot creates GL 3.3, rive's desktop floor is 4.2 — [details](docs/usage.md)); audio, Rive layout resizing, Luau scripting flags; C# is untested (ClassDB-registered, should work). See [`GOALS.md`](GOALS.md).
+**Not yet:** macOS/iOS (Metal), D3D12, Android, web; desktop Compatibility cannot render (Godot creates GL 3.3, rive's desktop floor is 4.2 — [details](docs/usage.md)); Rive layout Control-resizing; per-node audio buses. See [`GOALS.md`](GOALS.md).
 
 ## Try it
 
