@@ -76,6 +76,10 @@ void RiveControl::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("set_artboard_property", "path", "artboard_name"),
         &RiveControl::set_artboard_property);
+    ClassDB::bind_method(D_METHOD("set_hit_test_behavior", "behavior"),
+                         &RiveControl::set_hit_test_behavior);
+    ClassDB::bind_method(D_METHOD("get_hit_test_behavior"),
+                         &RiveControl::get_hit_test_behavior);
     ClassDB::bind_method(D_METHOD("set_gamepad_enabled", "enabled"),
                          &RiveControl::set_gamepad_enabled);
     ClassDB::bind_method(D_METHOD("get_gamepad_enabled"),
@@ -108,6 +112,9 @@ void RiveControl::_bind_methods() {
                  "set_pause_when_hidden", "get_pause_when_hidden");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "gamepad_enabled"),
                  "set_gamepad_enabled", "get_gamepad_enabled");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "hit_test_behavior",
+                              PROPERTY_HINT_ENUM, "Opaque,Translucent"),
+                 "set_hit_test_behavior", "get_hit_test_behavior");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "speed_scale",
                               PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"),
                  "set_speed_scale", "get_speed_scale");
@@ -260,6 +267,23 @@ void RiveControl::set_artboard_property(const String& p_path,
 void RiveControl::replace_view_model(const String& p_path, const String& p_view_model,
                                const String& p_instance_name) {
     rive.replace_view_model(p_path, p_view_model, p_instance_name);
+}
+
+void RiveControl::set_hit_test_behavior(int p_behavior) {
+    hit_test_behavior = CLAMP(p_behavior, 0, 1);
+}
+
+bool RiveControl::_has_point(const Vector2& p_point) const {
+    if (!Rect2(Vector2(), get_size()).has_point(p_point)) {
+        return false;
+    }
+    if (hit_test_behavior == 0 || !rive.is_live()) {
+        return true; // OPAQUE (or not ready): whole rect captures
+    }
+    // TRANSLUCENT: capture only over an interactive listener. Default
+    // true on the query failing (instance mid-rebuild) — fail safe to
+    // capturing, matching OPAQUE.
+    return rive.hit_test(p_point, get_size(), true);
 }
 
 void RiveControl::set_gamepad_enabled(bool p_enabled) {

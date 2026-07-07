@@ -236,18 +236,29 @@ func _process(_delta: float) -> void:
 		# Instance is live now (post-M1 load/instantiate is async); focus a
 		# keyboard-listening element.
 		key_control.focus_previous_element()
-	elif frames == 660:
+	elif frames == 640:
 		image_a = _screenshot()
+	elif frames == 660:
+		# Static-baseline guard: with focus settled and no input, the frame
+		# must be still — otherwise the toggle assertion below can pass on
+		# ambient animation instead of the key actually working.
+		var image_still := _screenshot()
+		if image_a.get_data() != image_still.get_data():
+			fail("keyboard fixture not static before key (weak baseline)")
+			return
 		_save(image_a, "api_smoke_keyboard_focused.png")
-		# Space keyup on the focused element (mirrors rive's focus_test).
+		# Space on the focused element, through real input routing
+		# (grab_focus + Viewport.push_input -> the control's _gui_input).
+		# NOTE: calling _gui_input() directly from GDScript does NOT work
+		# on GDExtension classes (engine virtuals are not script-callable).
+		key_control.grab_focus()
 		var down := InputEventKey.new()
 		down.keycode = KEY_SPACE
 		down.pressed = true
-		key_control.grab_focus()
-		key_control._gui_input(down)
+		get_viewport().push_input(down)
 		var up := down.duplicate()
 		up.pressed = false
-		key_control._gui_input(up)
+		get_viewport().push_input(up)
 	elif frames == 720:
 		var image_b := _screenshot()
 		_save(image_b, "api_smoke_keyboard_space.png")

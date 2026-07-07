@@ -264,6 +264,16 @@ Array RiveInstance::take_property_changes() {
 
 
 
+bool RiveInstance::hit_test(const Vector2& p_local,
+                            const Vector2& p_node_size,
+                            bool p_default) const {
+    RiveRenderServer* server = RiveRenderServer::get_singleton();
+    if (server == nullptr || instance_id == 0) {
+        return p_default;
+    }
+    return server->hit_test(instance_id, p_local, p_node_size, p_default);
+}
+
 void RiveInstance::key(int p_rive_key, int p_modifiers, bool p_pressed,
                        bool p_repeat) {
     RIVEGD_POST(rt_key, p_rive_key, p_modifiers, p_pressed, p_repeat);

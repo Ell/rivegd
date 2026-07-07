@@ -69,6 +69,14 @@ public:
                             const godot::String& p_view_model,
                             const godot::String& p_instance_name);
 
+    // 0 = OPAQUE (whole rect captures, default), 1 = TRANSLUCENT (only
+    // points over an interactive Rive listener capture; clicks elsewhere
+    // fall through to whatever is behind). Unity-equivalent hit modes.
+    void set_hit_test_behavior(int p_behavior);
+    int get_hit_test_behavior() const { return hit_test_behavior; }
+
+    bool _has_point(const godot::Vector2& p_point) const override;
+
     void set_gamepad_enabled(bool p_enabled);
     bool get_gamepad_enabled() const { return gamepad_enabled; }
     // Power-user/testing entry: submit a raw rive gamepad batch (wire v2).
@@ -113,6 +121,7 @@ private:
 
     RiveInstance rive;
     RiveGamepadEncoder gamepad_encoder;
+    int hit_test_behavior = 0;
     bool gamepad_enabled = false;
     bool playing = true;
     bool pause_when_hidden = true;

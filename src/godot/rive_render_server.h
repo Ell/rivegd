@@ -150,6 +150,13 @@ public:
     void rt_list_set(int64_t p_instance_id, const godot::String& p_path,
                      int p_index, const godot::String& p_sub_path,
                      const godot::Variant& p_value);
+    // Synchronous, main-thread-safe listener hit query (const geometry
+    // walk; guarded by flush_mutex). Returns true when an interactive
+    // listener is under the point. p_default when the instance is not
+    // live yet.
+    bool hit_test(int64_t p_instance_id, const godot::Vector2& p_local,
+                  const godot::Vector2& p_node_size, bool p_default);
+
     // Reads a list item's scalar and posts it to the property mailbox under
     // the synthetic path "<path>[<index>]/<sub_path>" (surfaced through
     // property_changed / get_property like any watched value).
@@ -197,6 +204,10 @@ private:
     bool frame_hook_connected = false;            // main thread only
 
     std::mutex mailbox_mutex;
+    // Serializes the render-thread pump (rt_flush_all: every rive mutation
+    // funnels through it post-M1) against synchronous main-thread reads
+    // (hit_test). Coarse by design — reads are rare (opt-in hit testing).
+    std::mutex flush_mutex;
     godot::HashMap<int64_t, godot::RID> texture_mailbox;
     godot::HashMap<int64_t, godot::RID> canvas_texture_mailbox;
     godot::HashMap<int64_t, godot::Array> event_mailbox;

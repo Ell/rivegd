@@ -593,6 +593,7 @@ void RiveRenderServer::rt_render_instance(int64_t p_instance_id,
 }
 
 void RiveRenderServer::rt_flush_all() {
+    std::lock_guard<std::mutex> flush_lock(flush_mutex);
     pump_pending.store(false);
     // Pump the CommandServer. Its Factory is fixed at construction and
     // files import through it — the GPU bridge MUST be resolved first, or
@@ -1192,6 +1193,28 @@ void RiveRenderServer::rt_list_set(int64_t p_instance_id, const String& p_path,
     }
     rive::rcp<rive::ViewModelInstanceRuntime> item = list->instanceAt(p_index);
     set_vm_value(item.get(), p_sub_path, p_value);
+}
+
+bool RiveRenderServer::hit_test(int64_t p_instance_id,
+                                const Vector2& p_local,
+                                const Vector2& p_node_size, bool p_default) {
+    std::lock_guard<std::mutex> flush_lock(flush_mutex);
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || !(*found)->valid ||
+        (*found)->state_machine == nullptr) {
+        return p_default;
+    }
+    Instance* instance = *found;
+    const float texture_x =
+        p_local.x * (float(instance->size.x) / MAX(1.0f, p_node_size.x));
+    const float texture_y =
+        p_local.y * (float(instance->size.y) / MAX(1.0f, p_node_size.y));
+    const ContainFit fit =
+        contain_fit(instance->artboard->width(), instance->artboard->height(),
+                    float(instance->size.x), float(instance->size.y));
+    const rive::Vec2D position((texture_x - fit.tx) / fit.scale,
+                               (texture_y - fit.ty) / fit.scale);
+    return instance->state_machine->hitTest(position);
 }
 
 void RiveRenderServer::rt_list_get(int64_t p_instance_id, const String& p_path,

@@ -265,10 +265,13 @@ Phases: 0 move, 1 down, 2 up, 3 exit. Godot raycasts don't return UVs, so
 face-UV interpolation via `MeshDataTool` for arbitrary meshes. Hover works
 too — forward phase 0 from mouse motion for rollover states.
 
-Note today: `RiveControl` is a rectangular hit area — a click on a
-*transparent* region of the artboard doesn't fall through to a control
-directly behind it (use `IGNORE` for display-only overlays, or `STOP` for
-modal). Per-pixel click-through is a possible future addition.
+For interactive overlays over an interactive game, set
+`hit_test_behavior = 1` (Translucent): the control captures pointer events
+**only where the artboard has an interactive listener** — clicks over
+empty/decorative regions fall through to whatever is behind. This is
+listener-aware (Rive's own hit test), more correct than alpha-based
+click-through: invisible hit areas still capture; opaque decoration does
+not block. Default (0, Opaque) captures the whole rect.
 
 See `demo/overlays.tscn` for health bars following moving enemies + a
 dialogue box.
