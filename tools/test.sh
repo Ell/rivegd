@@ -32,7 +32,7 @@ run_unit() {
         "$ROOT/tests/unit/riv_file_test.cpp" \
         "$ROOT/out/tests/riv_file.o" \
         "$ROOT/out/tests/no_op_factory.o" \
-        -L"$RIVE_OUT" -lrive -lrive_harfbuzz -lrive_sheenbidi -lrive_yoga \
+        -L"$RIVE_OUT" -lrive -lrive_harfbuzz -lrive_sheenbidi -lrive_yoga -lminiaudio \
         -o "$ROOT/out/tests/unit_tests"
     (cd "$ROOT" && ./out/tests/unit_tests)
 }
