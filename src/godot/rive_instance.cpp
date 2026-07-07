@@ -218,6 +218,10 @@ void RiveInstance::focus_move(int p_direction) {
     RIVEGD_POST(rt_focus_move, p_direction);
 }
 
+void RiveInstance::gamepads(const PackedByteArray& p_batch) {
+    RIVEGD_POST(rt_gamepads, p_batch);
+}
+
 void RiveInstance::list_append(const String& p_path, const String& p_view_model,
                                const String& p_instance_name) {
     RIVEGD_POST(rt_list_append, p_path, p_view_model, p_instance_name);

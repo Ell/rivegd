@@ -106,6 +106,8 @@ public:
     void rt_text_input(int64_t p_instance_id, const godot::String& p_text);
     // 0 = next, 1 = previous, 2 = left, 3 = right, 4 = up, 5 = down.
     void rt_focus_move(int64_t p_instance_id, int p_direction);
+    // Gamepad batch in rive's wire format (version 2, little-endian).
+    void rt_gamepads(int64_t p_instance_id, const godot::PackedByteArray& p_batch);
 
     // Image property: p_png_bytes is an encoded image (PNG/JPEG/WebP),
     // decoded on the render thread through the context factory.

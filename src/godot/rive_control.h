@@ -1,5 +1,6 @@
 #pragma once
 
+#include "godot/rive_gamepad_encoder.h"
 #include "godot/rive_instance.h"
 
 #include <godot_cpp/classes/control.hpp>
@@ -58,6 +59,11 @@ public:
                             const godot::String& p_view_model,
                             const godot::String& p_instance_name);
 
+    void set_gamepad_enabled(bool p_enabled);
+    bool get_gamepad_enabled() const { return gamepad_enabled; }
+    // Power-user/testing entry: submit a raw rive gamepad batch (wire v2).
+    void submit_gamepad_batch(const godot::PackedByteArray& p_batch);
+
     void focus_next_element();
     void focus_previous_element();
     void send_text_input(const godot::String& p_text);
@@ -80,6 +86,8 @@ private:
     godot::Vector2i texture_size() const;
 
     RiveInstance rive;
+    RiveGamepadEncoder gamepad_encoder;
+    bool gamepad_enabled = false;
     bool playing = true;
     bool pause_when_hidden = true;
     double speed_scale = 1.0;

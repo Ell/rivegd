@@ -76,6 +76,7 @@ public:
     void key(int p_rive_key, int p_modifiers, bool p_pressed, bool p_repeat);
     void text_input(const godot::String& p_text);
     void focus_move(int p_direction);
+    void gamepads(const godot::PackedByteArray& p_batch);
 
     // Dynamic inspector support (delegated from the owning node).
     void get_property_list(godot::List<godot::PropertyInfo>* p_list) const;

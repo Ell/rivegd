@@ -247,8 +247,54 @@ func _process(_delta: float) -> void:
 			fail("no audio flowed through RiveAudioStream (peak 0)")
 			return
 		print("audio peak observed: ", audio_peak)
+		_start_gamepad_phase()
+	elif frames == 840:
+		# Hard assertion: the hand-built batch must be ACCEPTED by rive's
+		# parser (a malformed batch prints "malformed gamepad batch").
+		# gamepadLog changing is a bonus (the fixture may be script-driven,
+		# and scripting is not compiled in).
+		print("gamepadLog: ", gamepad_control.get_property("gamepadLog"))
 		print("API SMOKE OK")
 		get_tree().quit(0)
+
+
+var gamepad_control: RiveControl
+
+
+func _start_gamepad_phase() -> void:
+	gamepad_control = RiveControl.new()
+	gamepad_control.file = load("res://fixtures/gamepad_test.riv")
+	gamepad_control.position = Vector2(32, 32)
+	gamepad_control.size = Vector2(400, 400)
+	add_child(gamepad_control)
+	gamepad_control.watch_property("gamepadLog")
+	# Hand-built wire-v2 batch: connect a standard pad, press south (A).
+	var batch := PackedByteArray()
+	batch.resize(4)
+	batch.encode_u32(0, 2)              # version
+	batch.push_back(0)                  # record: connected
+	var at := batch.size()
+	batch.resize(at + 4)
+	batch.encode_u32(at, 0)             # deviceId 0
+	batch.push_back(0)                  # mapping: standard
+	batch.push_back(17)                 # nButtons
+	batch.push_back(6)                  # nAxes
+	batch.push_back(0)                  # padding
+	for i in 17 + 6:                    # zeroed buttons + axes
+		at = batch.size()
+		batch.resize(at + 4)
+		batch.encode_float(at, 0.0)
+	batch.push_back(1)                  # record: update
+	at = batch.size()
+	batch.resize(at + 4)
+	batch.encode_u32(at, 0)             # deviceId 0
+	batch.push_back(1)                  # nChanges
+	batch.push_back(0)                  # kind: button
+	batch.push_back(0)                  # index: south
+	at = batch.size()
+	batch.resize(at + 4)
+	batch.encode_float(at, 1.0)         # pressed
+	gamepad_control.submit_gamepad_batch(batch)
 
 
 var audio_playback: RiveAudioStreamPlayback

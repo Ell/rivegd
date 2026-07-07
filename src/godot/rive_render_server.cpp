@@ -914,6 +914,20 @@ void RiveRenderServer::rt_focus_move(int64_t p_instance_id, int p_direction) {
     }
 }
 
+void RiveRenderServer::rt_gamepads(int64_t p_instance_id,
+                                   const PackedByteArray& p_batch) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->state_machine == nullptr) {
+        return;
+    }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
+    if (!(*found)->state_machine->submitGamepadsFromBuffer(p_batch.ptr(),
+                                                           p_batch.size())) {
+        ERR_PRINT("rivegd: malformed gamepad batch rejected");
+    }
+}
+
 void RiveRenderServer::rt_set_vm_image(int64_t p_instance_id,
                                        const String& p_path,
                                        const PackedByteArray& p_png_bytes) {

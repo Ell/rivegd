@@ -61,6 +61,12 @@ void RiveControl::_bind_methods() {
     ClassDB::bind_method(
         D_METHOD("set_artboard_property", "path", "artboard_name"),
         &RiveControl::set_artboard_property);
+    ClassDB::bind_method(D_METHOD("set_gamepad_enabled", "enabled"),
+                         &RiveControl::set_gamepad_enabled);
+    ClassDB::bind_method(D_METHOD("get_gamepad_enabled"),
+                         &RiveControl::get_gamepad_enabled);
+    ClassDB::bind_method(D_METHOD("submit_gamepad_batch", "batch"),
+                         &RiveControl::submit_gamepad_batch);
     ClassDB::bind_method(D_METHOD("focus_next_element"),
                          &RiveControl::focus_next_element);
     ClassDB::bind_method(D_METHOD("focus_previous_element"),
@@ -82,6 +88,8 @@ void RiveControl::_bind_methods() {
                  "is_playing");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "pause_when_hidden"),
                  "set_pause_when_hidden", "get_pause_when_hidden");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "gamepad_enabled"),
+                 "set_gamepad_enabled", "get_gamepad_enabled");
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "speed_scale",
                               PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"),
                  "set_speed_scale", "get_speed_scale");
@@ -199,6 +207,14 @@ void RiveControl::set_artboard_property(const String& p_path,
 void RiveControl::replace_view_model(const String& p_path, const String& p_view_model,
                                const String& p_instance_name) {
     rive.replace_view_model(p_path, p_view_model, p_instance_name);
+}
+
+void RiveControl::set_gamepad_enabled(bool p_enabled) {
+    gamepad_enabled = p_enabled;
+}
+
+void RiveControl::submit_gamepad_batch(const PackedByteArray& p_batch) {
+    rive.gamepads(p_batch);
 }
 
 void RiveControl::focus_next_element() { rive.focus_move(0); }
@@ -364,6 +380,12 @@ void RiveControl::_notification(int p_what) {
             }
             if (pause_when_hidden && !is_visible_in_tree()) {
                 break; // GOALS G4.6: hidden instances stop advancing
+            }
+            if (gamepad_enabled) {
+                PackedByteArray batch = gamepad_encoder.encode_frame();
+                if (!batch.is_empty()) {
+                    rive.gamepads(batch);
+                }
             }
             rive.frame(get_process_delta_time() * speed_scale);
             if (rive.update_texture_binding()) {
