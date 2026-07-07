@@ -78,9 +78,19 @@ $HUD.set_property("theme/accent", Color.CRIMSON)
 $HUD.fire_property_trigger("stats/level_up")
 ```
 
+Reads are watch-based (values live on the render thread, so reads are one
+frame behind writes):
+
+```gdscript
+$HUD.watch_property("stats/health")    # reports the current value immediately
+$HUD.property_changed.connect(func(path, value):
+    if path == "stats/health":
+        health_bar.value = value)
+print($HUD.get_property("stats/health"))   # last value seen
+```
+
 Values set from script or the inspector are cached and re-applied when the
-instance rebuilds (file swap, resize, hot reload). Reading values back and
-per-path change signals are on the roadmap (GOALS G4.4).
+instance rebuilds (file swap, resize, hot reload); watches re-arm too.
 
 ### Events & state changes
 
