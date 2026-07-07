@@ -127,7 +127,8 @@ python3 -m venv .venv && .venv/bin/pip install scons
 tools/test.sh all
 ```
 
-Linux needs: `clang`, `ninja`, `scons`, `uuid-dev`, and a C++17 gcc for the
+Linux needs: `clang`, `ninja`, `scons`, `uuid-dev`, `glslang-tools` (Vulkan
+shader generation), `libvulkan-dev`, and a C++17 gcc for the
 unit tests. The stage-1 build self-installs its pinned premake and fetches
 rive's vendored dependencies on first run.
 
