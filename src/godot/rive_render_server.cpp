@@ -43,6 +43,7 @@
 #include <godot_cpp/classes/rd_texture_view.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
 #include <godot_cpp/classes/audio_server.hpp>
+#include <godot_cpp/classes/display_server.hpp>
 #include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -76,6 +77,9 @@ struct RiveRenderServer::Instance {
     // its last contents.
     bool needs_render = true;
     bool settled = false;
+    // Reports already delivered from the current report generation (rive
+    // clears reports on advance; between advances they accumulate).
+    size_t events_delivered = 0;
 
     // Decoded RenderImages assigned to image properties (kept alive here;
     // keyed by path so reassignment releases the old one).
@@ -255,7 +259,10 @@ bool RiveRenderServer::rt_ensure_bridge() {
             return true;
         }
         bridge_failed = true;
-        if (driver.is_empty() || driver == "dummy") {
+        // Under --headless the display server is "headless" and the driver
+        // name still reflects the project setting — don't warn about that.
+        if (DisplayServer::get_singleton() != nullptr &&
+            DisplayServer::get_singleton()->get_name() == "headless") {
             print_verbose("rivegd: headless — running logic-only.");
         } else {
             ERR_PRINT("rivegd: no RenderingDevice and driver '" + driver +
@@ -424,16 +431,66 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
     }
 }
 
+void RiveRenderServer::rt_drain_reported_events(int64_t p_instance_id,
+                                                Instance* instance) {
+    const size_t event_count = instance->state_machine->reportedEventCount();
+    if (event_count <= instance->events_delivered) {
+        return;
+    }
+    Array batch;
+    for (size_t i = instance->events_delivered; i < event_count; ++i) {
+        const rive::EventReport report =
+            instance->state_machine->reportedEventAt(i);
+        rive::Event* event = report.event();
+        if (event == nullptr) {
+            continue;
+        }
+        Dictionary entry;
+        entry["name"] = String::utf8(event->name().c_str());
+        entry["seconds_delay"] = report.secondsDelay();
+        Dictionary properties;
+        for (rive::Component* child : event->children()) {
+            if (auto* b = child->as<rive::CustomPropertyBoolean>()) {
+                properties[String::utf8(b->name().c_str())] =
+                    b->propertyValue();
+            } else if (auto* n = child->as<rive::CustomPropertyNumber>()) {
+                properties[String::utf8(n->name().c_str())] =
+                    n->propertyValue();
+            } else if (auto* s = child->as<rive::CustomPropertyString>()) {
+                properties[String::utf8(s->name().c_str())] =
+                    String::utf8(s->propertyValue().c_str());
+            }
+        }
+        entry["properties"] = properties;
+        batch.push_back(entry);
+    }
+    instance->events_delivered = event_count;
+    if (!batch.is_empty()) {
+        std::lock_guard<std::mutex> lock(mailbox_mutex);
+        Array& events = event_mailbox[p_instance_id];
+        events.append_array(batch);
+    }
+}
+
 void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
     Instance** found = instances.getptr(p_instance_id);
-    if (found == nullptr || !(*found)->valid || bridge == nullptr) {
+    // No bridge is fine: logic-only instances still advance (G2.4);
+    // rendering is guarded separately in rt_flush_all.
+    if (found == nullptr || !(*found)->valid) {
         return;
     }
     Instance* instance = *found;
 
     if (instance->state_machine != nullptr) {
+        // Pointer-fired events live on the instance only until the next
+        // advance clears them — drain BEFORE advancing (rt_pointer also
+        // drains immediately, so this is a safety net for reports raised
+        // between frames by other paths).
+        rt_drain_reported_events(p_instance_id, instance);
+
         const bool advancing =
             instance->state_machine->advanceAndApply(static_cast<float>(p_delta));
+        instance->events_delivered = 0; // advance started a new generation
         if (advancing) {
             instance->settled = false;
             instance->needs_render = true;
@@ -443,44 +500,8 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
             instance->needs_render = true;
         }
 
-        // Marshal reported events to the main-thread mailbox.
-        const size_t event_count = instance->state_machine->reportedEventCount();
-        if (event_count > 0) {
-            Array batch;
-            for (size_t i = 0; i < event_count; ++i) {
-                const rive::EventReport report =
-                    instance->state_machine->reportedEventAt(i);
-                rive::Event* event = report.event();
-                if (event == nullptr) {
-                    continue;
-                }
-                Dictionary entry;
-                entry["name"] = String::utf8(event->name().c_str());
-                entry["seconds_delay"] = report.secondsDelay();
-                Dictionary properties;
-                for (rive::Component* child : event->children()) {
-                    if (auto* b = child->as<rive::CustomPropertyBoolean>()) {
-                        properties[String::utf8(b->name().c_str())] =
-                            b->propertyValue();
-                    } else if (auto* n =
-                                   child->as<rive::CustomPropertyNumber>()) {
-                        properties[String::utf8(n->name().c_str())] =
-                            n->propertyValue();
-                    } else if (auto* s =
-                                   child->as<rive::CustomPropertyString>()) {
-                        properties[String::utf8(s->name().c_str())] =
-                            String::utf8(s->propertyValue().c_str());
-                    }
-                }
-                entry["properties"] = properties;
-                batch.push_back(entry);
-            }
-            if (!batch.is_empty()) {
-                std::lock_guard<std::mutex> lock(mailbox_mutex);
-                Array& events = event_mailbox[p_instance_id];
-                events.append_array(batch);
-            }
-        }
+        // Timeline events raised during this advance.
+        rt_drain_reported_events(p_instance_id, instance);
 
         // State transitions -> state_changed signal (animation states carry
         // the meaningful names; entry/exit/any states are skipped).
@@ -689,6 +710,9 @@ void RiveRenderServer::rt_pointer(int64_t p_instance_id, int p_phase,
             instance->state_machine->pointerExit(position);
             break;
     }
+    // Listener-fired events are reported immediately and would be cleared
+    // by the next advance before rt_frame's drain saw them.
+    rt_drain_reported_events(p_instance_id, instance);
 }
 
 void RiveRenderServer::rt_set_vm_bool(int64_t p_instance_id,

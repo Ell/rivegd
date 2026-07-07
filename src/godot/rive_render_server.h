@@ -161,6 +161,7 @@ private:
 
     void on_frame_pre_draw(); // main thread: posts rt_flush_all
     void rt_render_instance(int64_t p_instance_id, Instance* p_instance);
+    void rt_drain_reported_events(int64_t p_instance_id, Instance* p_instance);
 
     bool rt_ensure_bridge();
 
