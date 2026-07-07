@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="RiveFileResource" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		A Rive [code].riv[/code] file, loaded as a Godot resource.
+	</brief_description>
+	<description>
+		Holds the raw bytes of a [code].riv[/code] file plus parsed metadata (artboards, state machines, inputs, view-model properties). Files load directly — [code]load("res://ui/menu.riv")[/code] — with no import step; decoding against the GPU happens lazily when an instance is created.
+		Assign to [member RiveSprite2D.file], [member RiveControl.file], or [member RiveTexture.file] to play it.
+	</description>
+	<tutorials>
+		<link title="Usage guide">https://github.com/Ell/rivegd/blob/main/docs/usage.md</link>
+	</tutorials>
+	<methods>
+		<method name="is_valid" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the data parsed as a valid Rive file. See [method get_import_error] when it did not.
+			</description>
+		</method>
+		<method name="get_import_error" qualifiers="const">
+			<return type="String" />
+			<description>
+				Human-readable reason the file failed to parse (empty when valid).
+			</description>
+		</method>
+		<method name="get_artboard_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Names of every artboard in the file.
+			</description>
+		</method>
+		<method name="get_state_machine_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="artboard" type="String" />
+			<description>
+				State machine names of [param artboard] (empty string = default artboard).
+			</description>
+		</method>
+		<method name="get_animation_names" qualifiers="const">
+			<return type="PackedStringArray" />
+			<param index="0" name="artboard" type="String" />
+			<description>
+				Linear animation names of [param artboard].
+			</description>
+		</method>
+		<method name="get_input_descriptions" qualifiers="const">
+			<return type="Array" />
+			<param index="0" name="artboard" type="String" />
+			<param index="1" name="state_machine" type="String" />
+			<description>
+				State machine inputs as Dictionaries: [code]{ name, type: "bool"|"number"|"trigger", default }[/code]. Empty strings select the defaults.
+			</description>
+		</method>
+		<method name="get_property_descriptions" qualifiers="const">
+			<return type="Array" />
+			<param index="0" name="artboard" type="String" />
+			<description>
+				View-model properties of the artboard's default view model as Dictionaries: [code]{ name, type, enum_values? }[/code].
+			</description>
+		</method>
+		<method name="get_artboard_size" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="artboard" type="String" />
+			<description>
+				Authored artboard size in Rive units.
+			</description>
+		</method>
+	</methods>
+</class>

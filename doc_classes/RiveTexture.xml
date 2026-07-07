@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="RiveTexture" inherits="Texture2DRD" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Rive output as a plain [Texture2D], usable in any texture slot.
+	</brief_description>
+	<description>
+		Renders [member file]'s artboard into a texture that works in any material, [TextureRect], 3D surface, particle, or shader uniform — no Rive node required. Advances itself every engine frame via [signal RenderingServer.frame_pre_draw].
+		Requires a RenderingDevice rendering method (Forward+/Mobile); under the Compatibility renderer use [RiveSprite2D] or [RiveControl] instead.
+	</description>
+	<tutorials>
+		<link title="Usage guide">https://github.com/Ell/rivegd/blob/main/docs/usage.md</link>
+	</tutorials>
+	<methods>
+		<method name="set_bool_input">
+			<return type="void" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="value" type="bool" />
+			<description>
+				Sets a boolean state machine input.
+			</description>
+		</method>
+		<method name="set_number_input">
+			<return type="void" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="value" type="float" />
+			<description>
+				Sets a number state machine input.
+			</description>
+		</method>
+		<method name="fire_trigger">
+			<return type="void" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Fires a trigger state machine input.
+			</description>
+		</method>
+		<method name="set_property">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="value" type="Variant" />
+			<description>
+				Writes a view-model property. Dispatch is by value type: [bool], [int]/[float], [String] (also enums), [Color], or [Image]/[Texture2D] for image properties. Paths may traverse nested view models: [code]"stats/health"[/code].
+			</description>
+		</method>
+		<method name="get_property" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Last value seen for a watched property (see [method watch_property]); falls back to the last value set.
+			</description>
+		</method>
+		<method name="watch_property">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Starts reporting changes of a view-model property via [signal property_changed]. The current value is reported immediately (except triggers, which only report when fired).
+			</description>
+		</method>
+		<method name="fire_property_trigger">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Fires a view-model trigger property.
+			</description>
+		</method>
+		<method name="set_artboard_property">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="artboard_name" type="String" />
+			<description>
+				Binds the named artboard from the same file to an artboard view-model property.
+			</description>
+		</method>
+		<method name="replace_view_model">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="view_model" type="String" />
+			<param index="2" name="instance_name" type="String" default="&quot;&quot;" />
+			<description>
+				Swaps the nested view-model instance at [param path] for a new instance of [param view_model] (a fresh instance when [param instance_name] is empty).
+			</description>
+		</method>
+		<method name="list_append">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="view_model" type="String" />
+			<param index="2" name="instance_name" type="String" default="&quot;&quot;" />
+			<description>
+				Appends an instance of [param view_model] to a list property. Watch the list path to observe its size.
+			</description>
+		</method>
+		<method name="list_remove_at">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="index" type="int" />
+			<description>
+				Removes the list item at [param index].
+			</description>
+		</method>
+		<method name="list_swap">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="a" type="int" />
+			<param index="2" name="b" type="int" />
+			<description>
+				Swaps two list items.
+			</description>
+		</method>
+		<method name="list_clear">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<description>
+				Removes all list items.
+			</description>
+		</method>
+		<method name="list_set_property">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="index" type="int" />
+			<param index="2" name="sub_path" type="String" />
+			<param index="3" name="value" type="Variant" />
+			<description>
+				Writes a scalar property on the list item at [param index].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="file" type="RiveFileResource" setter="set_file" getter="get_file">
+			The [code].riv[/code] file to play. Changing the resource (hot reload) rebuilds the instance in place.
+		</member>
+		<member name="artboard" type="String" setter="set_artboard" getter="get_artboard" default="&quot;&quot;">
+			Artboard name (empty = the file's default). Shown as a dropdown in the inspector.
+		</member>
+		<member name="state_machine" type="String" setter="set_state_machine" getter="get_state_machine" default="&quot;&quot;">
+			State machine name (empty = the artboard's first).
+		</member>
+		<member name="render_size" type="Vector2i" setter="set_render_size" getter="get_render_size" default="Vector2i(512, 512)">
+			Render texture size in pixels.
+		</member>
+		<member name="playing" type="bool" setter="set_playing" getter="is_playing" default="true">
+			Whether the state machine advances each frame.
+		</member>
+		<member name="speed_scale" type="float" setter="set_speed_scale" getter="get_speed_scale" default="1.0">
+			Playback speed multiplier (also affected by [member Engine.time_scale]).
+		</member>
+	</members>
+	<signals>
+		<signal name="rive_event">
+			<param index="0" name="name" type="String" />
+			<param index="1" name="properties" type="Dictionary" />
+			<description>
+				A Rive event reported by the state machine, with its custom properties.
+			</description>
+		</signal>
+		<signal name="state_changed">
+			<param index="0" name="state_name" type="String" />
+			<description>
+				The state machine entered a new animation state.
+			</description>
+		</signal>
+		<signal name="property_changed">
+			<param index="0" name="path" type="String" />
+			<param index="1" name="value" type="Variant" />
+			<description>
+				A watched view-model property changed (see [method watch_property]).
+			</description>
+		</signal>
+	</signals>
+</class>

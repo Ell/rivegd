@@ -52,8 +52,15 @@ env.Append(
 # defaults — it never includes rive renderer headers directly.
 core_env = env.Clone()
 core_env.Append(CXXFLAGS=["-fno-rtti"])
+# In-editor class reference (F1 help), compiled into the library.
+if env["target"] in ["editor", "template_debug"]:
+    doc_data = env.GodotCPPDocData(
+        "src/gen/doc_data.gen.cpp", source=Glob("doc_classes/*.xml")
+    )
+
 sources = (
-    [core_env.SharedObject(f) for f in Glob("src/core/*.cpp")]
+    ([doc_data] if env["target"] in ["editor", "template_debug"] else [])
+    + [core_env.SharedObject(f) for f in Glob("src/core/*.cpp")]
     + [core_env.SharedObject(f) for f in Glob("src/render/*/*.cpp")]
     + [core_env.SharedObject("thirdparty/rive-runtime/utils/no_op_factory.cpp")]
     + Glob("src/godot/*.cpp")
