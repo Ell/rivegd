@@ -93,14 +93,10 @@ private:
     void post_input(const godot::String& p_name, const godot::Variant& p_value);
 
     int64_t instance_id = 0;
+    // Shared queue import (one per resource, refcounted); file_handle is
+    // its handle, cached for the queue calls below.
+    RiveFileResource::SharedFile* shared_file = nullptr;
     uint64_t file_handle = 0;
-    // Out-of-band asset handles registered for this instance's file
-    // (deleted on release; deletion auto-clears the global registry).
-    struct OobHandle {
-        int type = 0; // 0 image, 1 font, 2 audio
-        uint64_t handle = 0;
-    };
-    godot::LocalVector<OobHandle> oob_handles;
     uint64_t artboard_handle = 0;
     uint64_t state_machine_handle = 0;
     godot::RID canvas_texture;
