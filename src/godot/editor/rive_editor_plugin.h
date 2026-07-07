@@ -1,5 +1,6 @@
 #pragma once
 
+#include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/editor_inspector_plugin.hpp>
 #include <godot_cpp/classes/editor_plugin.hpp>
 #include <godot_cpp/classes/editor_resource_preview_generator.hpp>
@@ -38,6 +39,28 @@ protected:
     static void _bind_methods() {}
 };
 
+// Drag-and-drop instantiation (GOALS G3.4): dropping a .riv from the
+// FileSystem dock onto the 2D editor creates a configured node at the
+// drop point. Godot's canvas editor doesn't forward drops of custom
+// resource types to plugins, so this overlay sits on the editor main
+// screen: mouse_filter is IGNORE (fully inert) except while a single-.riv
+// drag is in flight over the visible 2D screen.
+class RiveDropOverlay : public godot::Control {
+    GDCLASS(RiveDropOverlay, godot::Control)
+
+public:
+    void _process(double p_delta) override;
+    bool _can_drop_data(const godot::Vector2& p_at,
+                        const godot::Variant& p_data) const override;
+    void _drop_data(const godot::Vector2& p_at,
+                    const godot::Variant& p_data) override;
+
+    godot::EditorPlugin* plugin = nullptr; // for undo/redo
+
+protected:
+    static void _bind_methods() {}
+};
+
 class RiveEditorPlugin : public godot::EditorPlugin {
     GDCLASS(RiveEditorPlugin, godot::EditorPlugin)
 
@@ -51,6 +74,7 @@ protected:
 private:
     godot::Ref<RiveInspectorPlugin> inspector_plugin;
     godot::Ref<RivePreviewGenerator> preview_generator;
+    RiveDropOverlay* drop_overlay = nullptr;
 };
 
 } // namespace rivegd

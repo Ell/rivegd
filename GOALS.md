@@ -26,7 +26,7 @@ Design rationale and evidence live in [`docs/implementation-strategy.md`](docs/i
 - **G3.1** `.riv` files import automatically as raw-byte resources; decode is deferred to runtime against the live render context (the RenderContext *is* the rive::Factory — import-time GPU decode is wrong by construction).
 - **G3.2** FileSystem-dock thumbnails and an inspector preview (artboard/state-machine pickers, live scrub/playback) rendered by the real renderer — WYSIWYG.
 - **G3.3** Hot reload: re-export from the Rive editor updates a running editor preview (and a `--debug` game) in place, preserving matching input values.
-- **G3.4** Drag-and-drop instantiation: `.riv` → viewport creates a configured node.
+- **G3.4** Drag-and-drop instantiation: `.riv` → viewport creates a configured node. ✅ (drop overlay on the editor main screen — inert except during .riv drags; RiveControl for Control scenes, RiveSprite2D otherwise, undo-aware, drop-point positioned)
 - **G3.5** Node configuration warnings for stale references (missing artboard, deleted input, scripts present but scripting disabled).
 - **G3.6** Out-of-band assets (images, fonts, audio) resolve automatically: referenced assets are found by rive's export convention (`<name>-<id>.<ext>` next to the `.riv`), decoded through the CommandQueue, and registered in its global asset registry before import. ✅ (verified: walle.riv's referenced PNGs render; `get_asset_descriptions()` exposes the manifest)
 
