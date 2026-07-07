@@ -122,6 +122,18 @@ $HUD.set_artboard_property("slot", "CoolWidget")      # bindable artboard by nam
 $HUD.replace_view_model("child", "ChildVM", "variant-b")  # swap nested instance
 ```
 
+### Targeted callables
+
+Sugar over the signals — filter by name/path without writing the `if` yourself:
+
+```gdscript
+$Menu.on_event("purchase", func(props): buy(props.sku))
+$HUD.on_property("stats/health", func(v): bar.value = v)  # auto-watches the path
+```
+
+Both return the connected `Callable`; pass it to `disconnect("rive_event", cb)`
+/ `disconnect("property_changed", cb)` to unsubscribe.
+
 ### Events & state changes
 
 Rive events surface as a signal with custom properties as a Dictionary;

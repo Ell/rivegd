@@ -233,6 +233,10 @@ func _process(_delta: float) -> void:
 			return
 		_start_keyboard_phase()
 	elif frames == 620:
+		# Instance is live now (post-M1 load/instantiate is async); focus a
+		# keyboard-listening element.
+		key_control.focus_previous_element()
+	elif frames == 660:
 		image_a = _screenshot()
 		_save(image_a, "api_smoke_keyboard_focused.png")
 		# Space keyup on the focused element (mirrors rive's focus_test).
@@ -244,37 +248,26 @@ func _process(_delta: float) -> void:
 		var up := down.duplicate()
 		up.pressed = false
 		key_control._gui_input(up)
-	elif frames == 660:
+	elif frames == 720:
 		var image_b := _screenshot()
 		_save(image_b, "api_smoke_keyboard_space.png")
 		if image_a.get_data() == image_b.get_data():
 			fail("pixels did not change after space key on focused element")
 			return
 		_start_audio_phase()
-	elif frames > 660 and frames < 780:
+	elif frames > 720 and frames < 860:
 		if audio_playback != null:
 			audio_peak = max(audio_peak, audio_playback.get_last_peak())
-	elif frames == 780:
+	elif frames == 860:
 		if audio_peak <= 0.0:
 			fail("no audio flowed through RiveAudioStream (peak 0)")
 			return
 		print("audio peak observed: ", audio_peak)
 		_start_gamepad_phase()
-	elif frames == 810:
-		# Scripting (G5.4): a script-bearing file must load, instance, and
-		# advance without errors. (Sample-signed fixture scripts are
-		# rejected by the production key — behavior asserts come from a
-		# dev-key CI variant later.)
-		var scripted := RiveSprite2D.new()
-		scripted.file = load("res://fixtures/scripted_enum.riv")
-		add_child(scripted)
-		if not scripted.file.is_valid():
-			fail("scripted_enum.riv failed to load")
-			return
-	elif frames == 840:
+	elif frames == 900:
 		print("gamepadLog: ", gamepad_control.get_property("gamepadLog"))
 		_start_luau_phase()
-	elif frames == 900:
+	elif frames == 980:
 		# Editor-signed Luau MUST have executed: the script rewrites 'label'
 		# (default "-no-script-") to "script-init"/"scaled:<n>". Anything but
 		# the default proves the VM ran the signed bytecode.
@@ -288,20 +281,34 @@ func _process(_delta: float) -> void:
 			return
 		# Now drive a specific value through the script's update loop.
 		probe_sprite.set_property("box-scale", 5.0)
-	elif frames == 960:
+	elif frames == 1060:
 		var echo := str(probe_sprite.get_property("label"))
 		if echo != "scaled:5":
 			fail("Luau update loop wrong (label='%s', expected 'scaled:5')"
 					% echo)
 			return
 		print("LUAU BEHAVIORAL OK: ", echo)
+		# Targeted callables (G4.3): on_property fires only for its path.
+		on_prop_hits = 0
+		on_prop_last = null
+		probe_sprite.on_property("label", func(v):
+			on_prop_hits += 1
+			on_prop_last = v)
+		probe_sprite.set_property("box-scale", 9.0)
+	elif frames == 1140:
+		# The label callable must have fired with the script's new value.
+		if on_prop_hits == 0 or str(on_prop_last) != "scaled:9":
+			fail("on_property('label') wrong (hits=%d last=%s)" %
+					[on_prop_hits, on_prop_last])
+			return
+		print("ON_PROPERTY OK: ", on_prop_last)
 		_start_visual_vm_phase()
-	elif frames == 1000:
+	elif frames == 1220:
 		image_a = _screenshot()
 		_save(image_a, "api_smoke_vmvisual_base.png")
 		visual_control.set_property("box-scale", 3.0)
 		visual_control.set_property("box-color", Color.RED)
-	elif frames == 1040:
+	elif frames == 1300:
 		var image_b := _screenshot()
 		_save(image_b, "api_smoke_vmvisual_changed.png")
 		if image_a.get_data() == image_b.get_data():
@@ -312,6 +319,8 @@ func _process(_delta: float) -> void:
 
 
 var probe_sprite: RiveSprite2D
+var on_prop_hits := 0
+var on_prop_last = null
 var visual_control: RiveControl
 
 

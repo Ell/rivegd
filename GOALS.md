@@ -34,7 +34,7 @@ Design rationale and evidence live in [`docs/implementation-strategy.md`](docs/i
 
 - **G4.1** Node types: `RiveSprite2D` (Node2D), `RiveControl` (Control), plus `RiveTexture` for any texture slot (3D materials, TextureRect, shaders, particles).
 - **G4.2** State machine inputs and view-model (data binding) properties are **real Godot properties** — inspector-editable (checkboxes/sliders/trigger buttons/color pickers/enum dropdowns), animatable by AnimationPlayer, tweenable.
-- **G4.3** Script callbacks, three tiers: signals (`rive_event`, `state_changed`, `animation_finished`, `input_changed`, `rive_audio_event`), targeted Callables (`on_event(name, callable)`, `bind_property(path, callable)` with subscription handles), and awaiters (`await rive.event_fired("...")`).
+- **G4.3** Script callbacks: signals (`rive_event`, `state_changed`, `property_changed`) ✅ and targeted Callables (`on_event(name, callable)`, `on_property(path, callable)`, returning the Callable for unsubscribe) ✅. Awaiters are trivially `await node.rive_event` in GDScript. `animation_finished`/`input_changed`/`rive_audio_event` signals not yet distinct.
 - **G4.4** Data binding is first-class: typed, path-addressed view-model properties, two-way, with change signals. This is the primary Rive↔game contract, and coverage means **every** view-model type Rive can author, each mapped to an idiomatic Godot type:
 
   | Rive VM type | Godot mapping | Status |

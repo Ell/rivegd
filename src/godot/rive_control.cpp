@@ -47,6 +47,16 @@ void RiveControl::_bind_methods() {
                          &RiveControl::watch_property);
     ClassDB::bind_method(D_METHOD("get_property", "path"),
                          &RiveControl::get_property);
+    ClassDB::bind_method(D_METHOD("on_event", "name", "callable"),
+                         &RiveControl::on_event);
+    ClassDB::bind_method(D_METHOD("on_property", "path", "callable"),
+                         &RiveControl::on_property);
+    ClassDB::bind_method(D_METHOD("_dispatch_event", "event_name",
+                                  "properties", "want", "callable"),
+                         &RiveControl::_dispatch_event);
+    ClassDB::bind_method(D_METHOD("_dispatch_property", "path", "value",
+                                  "want", "callable"),
+                         &RiveControl::_dispatch_property);
     ClassDB::bind_method(
         D_METHOD("list_append", "path", "view_model", "instance_name"),
         &RiveControl::list_append, DEFVAL(String()));
@@ -179,6 +189,36 @@ void RiveControl::watch_property(const String& p_path) {
 
 Variant RiveControl::get_property(const String& p_path) const {
     return rive.get_property(p_path);
+}
+
+void RiveControl::_dispatch_event(const String& p_event_name,
+                            const Dictionary& p_properties, const String& p_want,
+                            const Callable& p_callable) {
+    if (p_event_name == p_want) {
+        p_callable.call(p_properties);
+    }
+}
+
+void RiveControl::_dispatch_property(const String& p_path, const Variant& p_value,
+                              const String& p_want, const Callable& p_callable) {
+    if (p_path == p_want) {
+        p_callable.call(p_value);
+    }
+}
+
+Callable RiveControl::on_event(const String& p_name, const Callable& p_callable) {
+    Callable wrapper = callable_mp(this, &RiveControl::_dispatch_event)
+                           .bind(p_name, p_callable);
+    connect("rive_event", wrapper);
+    return wrapper;
+}
+
+Callable RiveControl::on_property(const String& p_path, const Callable& p_callable) {
+    watch_property(p_path); // ensure changes are reported
+    Callable wrapper = callable_mp(this, &RiveControl::_dispatch_property)
+                           .bind(p_path, p_callable);
+    connect("property_changed", wrapper);
+    return wrapper;
 }
 
 void RiveControl::list_append(const String& p_path, const String& p_view_model,

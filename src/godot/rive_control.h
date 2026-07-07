@@ -44,6 +44,14 @@ public:
     void fire_property_trigger(const godot::String& p_path);
     void watch_property(const godot::String& p_path);
     godot::Variant get_property(const godot::String& p_path) const;
+
+    // Targeted callables (G4.3 tier 2): sugar over the rive_event /
+    // property_changed signals. Each returns the connected Callable so it
+    // can be passed to disconnect() to unsubscribe.
+    godot::Callable on_event(const godot::String& p_name,
+                             const godot::Callable& p_callable);
+    godot::Callable on_property(const godot::String& p_path,
+                                const godot::Callable& p_callable);
     void list_append(const godot::String& p_path,
                      const godot::String& p_view_model,
                      const godot::String& p_instance_name);
@@ -83,6 +91,17 @@ public:
     bool _get(const godot::StringName& p_name, godot::Variant& r_value) const;
     void _get_property_list(godot::List<godot::PropertyInfo>* p_list) const;
     void _validate_property(godot::PropertyInfo& p_property) const;
+
+    // Signal-forwarding dispatchers for on_event/on_property (bound
+    // callables; not meant to be called directly).
+    void _dispatch_event(const godot::String& p_event_name,
+                         const godot::Dictionary& p_properties,
+                         const godot::String& p_want,
+                         const godot::Callable& p_callable);
+    void _dispatch_property(const godot::String& p_path,
+                            const godot::Variant& p_value,
+                            const godot::String& p_want,
+                            const godot::Callable& p_callable);
 
 protected:
     static void _bind_methods();
