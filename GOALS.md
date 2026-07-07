@@ -84,6 +84,28 @@ Design in [`docs/development-and-testing.md`](docs/development-and-testing.md).
 - **G7.5** Fast inner loop: SCons dev builds + GDExtension hot reload into a symlinked demo project; sanitizer and trace-log (`RIVE_GD_TRACE`) debugging paths documented.
 - **G7.6** Web builds are tested in real browsers, not just compiled: Playwright harness covering dlink load, both WebGL2 render paths (pixel-local-storage and forced-MSAA fallback), single-thread behavior parity, an Emscripten/template lockstep gate, and a wasm size budget.
 
+## Roadmap (gap-driven, from docs/comparison-rive-unity.md)
+
+Ordered by value; derived from the July 2026 feature comparison against
+rive-unity (Rive's first-party Unity runtime):
+
+1. **Out-of-band assets** (G3.6) — referenced images/fonts/audio resolve
+   through Godot; rive-unity ships this. Buildable now.
+2. **Platform matrix** — Metal (macOS/iOS), D3D12, Android GLES3, WebGL2.
+   The defining gap (rive-unity ships 6 backends); hardware/toolchain-gated,
+   RenderBridge is ready for it.
+3. **Input polish** — multitouch; listener-aware hit testing (block pointer
+   events only where a Rive listener is — Unity's "Translucent").
+4. **Verification fixtures** for scrolling/virtualization + N-slicing
+   (authored via the Rive editor MCP).
+5. **Ergonomics** — per-node audio bus routing, DPI/layout scale modes.
+6. **Later** — panel compositor (many artboards, one texture), procedural
+   rendering API, RenderTexture→image binding, texture compression
+   (roadmap for rive-unity too).
+
+Already ahead of rive-unity (keep green): Luau scripting (verified),
+keyboard/focus/text input, gamepad, ordering guarantees, headless.
+
 ## Non-goals (scope discipline)
 
 - **N1** No authoring: we render/drive `.riv` files; the Rive editor is the authoring tool. No .riv writing/patching.
