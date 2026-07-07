@@ -32,7 +32,7 @@ linux:
     # uuid-dev: premake's bootstrap compiles against uuid/uuid.h.
     - apt-get install -y --no-install-recommends
       build-essential clang ninja-build scons git curl unzip ca-certificates
-      uuid-dev
+      uuid-dev glslang-tools
   script:
     # Stage 1: rive static libs (premake self-bootstraps; fetches pinned deps).
     - tools/build_rive.sh release

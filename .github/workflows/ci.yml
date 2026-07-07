@@ -24,7 +24,7 @@ jobs:
         run: |
           sudo apt-get update
           # uuid-dev: premake's bootstrap compiles against uuid/uuid.h.
-          sudo apt-get install -y --no-install-recommends clang ninja-build scons uuid-dev
+          sudo apt-get install -y --no-install-recommends clang ninja-build scons uuid-dev glslang-tools
 
       - name: Cache rive stage-1 build
         uses: actions/cache@v4
