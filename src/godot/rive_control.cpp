@@ -67,6 +67,8 @@ void RiveControl::_bind_methods() {
                          &RiveControl::get_gamepad_enabled);
     ClassDB::bind_method(D_METHOD("submit_gamepad_batch", "batch"),
                          &RiveControl::submit_gamepad_batch);
+    ClassDB::bind_method(D_METHOD("send_pointer_event", "phase", "position"),
+                         &RiveControl::send_pointer_event);
     ClassDB::bind_method(D_METHOD("focus_next_element"),
                          &RiveControl::focus_next_element);
     ClassDB::bind_method(D_METHOD("focus_previous_element"),
@@ -215,6 +217,12 @@ void RiveControl::set_gamepad_enabled(bool p_enabled) {
 
 void RiveControl::submit_gamepad_batch(const PackedByteArray& p_batch) {
     rive.gamepads(p_batch);
+}
+
+void RiveControl::send_pointer_event(int p_phase, const Vector2& p_position) {
+    if (rive.is_live()) {
+        rive.pointer(p_phase, p_position, get_size());
+    }
 }
 
 void RiveControl::focus_next_element() { rive.focus_move(0); }

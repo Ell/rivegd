@@ -62,3 +62,6 @@ jobs:
           # the real gate.
           ./Godot_v4.7-stable_linux.x86_64 --headless --path tests/project --import || true
           ./Godot_v4.7-stable_linux.x86_64 --headless --path tests/project --script smoke.gd
+          # Ordering guarantees (event/property delivery order; headless).
+          ./Godot_v4.7-stable_linux.x86_64 --headless --path tests/project ordering_smoke.tscn 2>&1 | tee /tmp/ord.log
+          grep -q "ORDERING OK" /tmp/ord.log

@@ -42,6 +42,10 @@ PackedStringArray RiveFileResource::get_state_machine_names(
     if (riv_file != nullptr) {
         const core::ArtboardMeta* meta =
             riv_file->find_artboard(p_artboard.utf8().get_data());
+        if (meta == nullptr && !riv_file->artboards().empty() &&
+            p_artboard.is_empty()) {
+            meta = &riv_file->artboards()[0];
+        }
         if (meta != nullptr) {
             for (const core::StateMachineMeta& sm : meta->state_machines) {
                 names.push_back(String::utf8(sm.name.c_str()));

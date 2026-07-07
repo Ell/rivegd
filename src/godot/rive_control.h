@@ -64,6 +64,10 @@ public:
     // Power-user/testing entry: submit a raw rive gamepad batch (wire v2).
     void submit_gamepad_batch(const godot::PackedByteArray& p_batch);
 
+    // Programmatic pointer injection (control-local coordinates); phase:
+    // 0 = move, 1 = down, 2 = up, 3 = exit. Same path as _gui_input.
+    void send_pointer_event(int p_phase, const godot::Vector2& p_position);
+
     void focus_next_element();
     void focus_previous_element();
     void send_text_input(const godot::String& p_text);
