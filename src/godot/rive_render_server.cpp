@@ -324,10 +324,14 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
     // Data binding: bind the artboard's default view model instance when it
     // declares one; otherwise fall back to a fresh instance of the
     // artboard's view model (no-op when the artboard has no view model).
-    rive::rcp<rive::ViewModelInstance> vmi =
-        instance->file->createDefaultViewModelInstance(instance->artboard.get());
-    if (vmi == nullptr) {
-        vmi = instance->file->createViewModelInstance(instance->artboard.get());
+    rive::rcp<rive::ViewModelInstance> vmi;
+    if (instance->artboard->viewModelId() != -1) { // silent when no VM at all
+        vmi = instance->file->createDefaultViewModelInstance(
+            instance->artboard.get());
+        if (vmi == nullptr) {
+            vmi = instance->file->createViewModelInstance(
+                instance->artboard.get());
+        }
     }
     if (vmi != nullptr) {
         if (instance->state_machine != nullptr) {

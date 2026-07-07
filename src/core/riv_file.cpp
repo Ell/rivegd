@@ -95,7 +95,9 @@ std::unique_ptr<RivFile> RivFile::import(const uint8_t* data,
                 meta.state_machines.push_back(std::move(sm_meta));
             }
             rive::ViewModelRuntime* view_model =
-                out->m_file->defaultArtboardViewModel(instance.get());
+                instance->viewModelId() == -1
+                    ? nullptr // silent when the artboard has no view model
+                    : out->m_file->defaultArtboardViewModel(instance.get());
             if (view_model != nullptr) {
                 // Temp instance for probing enum option lists.
                 rive::rcp<rive::ViewModelInstanceRuntime> probe =
