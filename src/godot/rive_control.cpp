@@ -20,6 +20,11 @@ void RiveControl::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_artboard", "artboard"),
                          &RiveControl::set_artboard);
     ClassDB::bind_method(D_METHOD("get_artboard"), &RiveControl::get_artboard);
+    ClassDB::bind_method(D_METHOD("set_fit", "fit"), &RiveControl::set_fit);
+    ClassDB::bind_method(D_METHOD("get_fit"), &RiveControl::get_fit);
+    ClassDB::bind_method(D_METHOD("set_alignment", "alignment"),
+                         &RiveControl::set_alignment);
+    ClassDB::bind_method(D_METHOD("get_alignment"), &RiveControl::get_alignment);
     ClassDB::bind_method(D_METHOD("set_state_machine", "state_machine"),
                          &RiveControl::set_state_machine);
     ClassDB::bind_method(D_METHOD("get_state_machine"),
@@ -106,6 +111,12 @@ void RiveControl::_bind_methods() {
                  "get_artboard");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "state_machine"),
                  "set_state_machine", "get_state_machine");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "fit", PROPERTY_HINT_ENUM,
+                              "Contain,Cover,Fill,Fit Width,Fit Height,None,Scale Down,Layout"),
+                 "set_fit", "get_fit");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "alignment", PROPERTY_HINT_ENUM,
+                              "Top Left,Top Center,Top Right,Center Left,Center,Center Right,Bottom Left,Bottom Center,Bottom Right"),
+                 "set_alignment", "get_alignment");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing"), "set_playing",
                  "is_playing");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "pause_when_hidden"),
@@ -119,6 +130,7 @@ void RiveControl::_bind_methods() {
                               PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"),
                  "set_speed_scale", "get_speed_scale");
 
+    ADD_SIGNAL(MethodInfo("loaded"));
     ADD_SIGNAL(MethodInfo("rive_event",
                           PropertyInfo(Variant::STRING, "name"),
                           PropertyInfo(Variant::DICTIONARY, "properties")));
@@ -151,6 +163,19 @@ void RiveControl::set_artboard(const String& p_artboard) {
     update_minimum_size();
     update_configuration_warnings();
     notify_property_list_changed();
+}
+
+void RiveControl::set_fit(int p_fit) {
+    rive.fit = CLAMP(p_fit, 0, 7);
+    recreate_instance();
+}
+
+void RiveControl::set_alignment(int p_alignment) {
+    alignment_index = CLAMP(p_alignment, 0, 8);
+    // 3x3 anchor grid -> [-1,1] per axis.
+    rive.alignment = godot::Vector2(float(alignment_index % 3) - 1.0f,
+                                    float(alignment_index / 3) - 1.0f);
+    recreate_instance();
 }
 
 void RiveControl::set_state_machine(const String& p_state_machine) {
@@ -490,6 +515,10 @@ void RiveControl::_notification(int p_what) {
             rive.frame(get_process_delta_time() * speed_scale);
             if (rive.update_texture_binding()) {
                 queue_redraw();
+                // First bind after (re)create: the instance is live on the
+                // render thread — VM reads/writes and pointer input are
+                // now meaningful (mirrors rive-unity's WidgetStatus.Loaded).
+                emit_signal("loaded");
             }
             Array events = rive.take_events();
             for (int i = 0; i < events.size(); ++i) {

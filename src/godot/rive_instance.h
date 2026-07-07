@@ -19,6 +19,11 @@ public:
     godot::Ref<RiveFileResource> file;
     godot::String artboard;
     godot::String state_machine;
+    // Artboard->texture fit (RiveRenderServer::FitMode) and alignment in
+    // [-1,1] per axis (used by every mode except FILL/LAYOUT). Set before
+    // create(); changing them on a node recreates the instance.
+    int fit = 0;
+    godot::Vector2 alignment;
 
     // Posts instance creation (and replays cached inputs). No-op without a
     // valid file.

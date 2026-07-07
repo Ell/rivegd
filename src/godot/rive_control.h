@@ -24,6 +24,11 @@ public:
     void set_artboard(const godot::String& p_artboard);
     godot::String get_artboard() const { return rive.artboard; }
 
+    void set_fit(int p_fit);
+    int get_fit() const { return rive.fit; }
+    void set_alignment(int p_alignment);
+    int get_alignment() const { return alignment_index; }
+
     void set_state_machine(const godot::String& p_state_machine);
     godot::String get_state_machine() const { return rive.state_machine; }
 
@@ -120,6 +125,7 @@ private:
     godot::Vector2i texture_size() const;
 
     RiveInstance rive;
+    int alignment_index = 4; // Center
     RiveGamepadEncoder gamepad_encoder;
     int hit_test_behavior = 0;
     bool gamepad_enabled = false;

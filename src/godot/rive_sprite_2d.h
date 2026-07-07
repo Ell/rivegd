@@ -17,6 +17,11 @@ public:
     void set_artboard(const godot::String& p_artboard);
     godot::String get_artboard() const { return rive.artboard; }
 
+    void set_fit(int p_fit);
+    int get_fit() const { return rive.fit; }
+    void set_alignment(int p_alignment);
+    int get_alignment() const { return alignment_index; }
+
     void set_state_machine(const godot::String& p_state_machine);
     godot::String get_state_machine() const { return rive.state_machine; }
 
@@ -90,6 +95,7 @@ private:
     void recreate_instance();
 
     RiveInstance rive;
+    int alignment_index = 4; // Center
     godot::Vector2i size = godot::Vector2i(512, 512);
     bool playing = true;
     bool pause_when_hidden = true;

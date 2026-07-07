@@ -70,13 +70,25 @@ public:
     godot::Array take_property_changes(int64_t p_instance_id);
 
     enum PointerPhase { POINTER_MOVE = 0, POINTER_DOWN, POINTER_UP, POINTER_EXIT };
+    // Artboard->texture fit modes (mirrors rive::Fit).
+    enum FitMode {
+        FIT_CONTAIN = 0,
+        FIT_COVER,
+        FIT_FILL,
+        FIT_WIDTH,
+        FIT_HEIGHT,
+        FIT_NONE,
+        FIT_SCALE_DOWN,
+        FIT_LAYOUT,
+    };
 
     // Render thread only (invoked through CommandQueue::runOnce closures).
     // Handles were minted by queue lifecycle calls on the main thread.
     void rt_init_instance(int64_t p_instance_id, uint64_t p_file_handle,
                           uint64_t p_artboard_handle,
                           uint64_t p_state_machine_handle,
-                          const godot::Vector2i& p_size);
+                          const godot::Vector2i& p_size, int p_fit,
+                          const godot::Vector2& p_alignment);
     void rt_frame(int64_t p_instance_id, double p_delta); // advance only
     // Renders every instance that needs it in one batch (one submission).
     // Posted once per engine frame from the frame_pre_draw hook.

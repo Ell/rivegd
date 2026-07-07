@@ -25,6 +25,11 @@ void RiveTexture::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_artboard", "artboard"),
                          &RiveTexture::set_artboard);
     ClassDB::bind_method(D_METHOD("get_artboard"), &RiveTexture::get_artboard);
+    ClassDB::bind_method(D_METHOD("set_fit", "fit"), &RiveTexture::set_fit);
+    ClassDB::bind_method(D_METHOD("get_fit"), &RiveTexture::get_fit);
+    ClassDB::bind_method(D_METHOD("set_alignment", "alignment"),
+                         &RiveTexture::set_alignment);
+    ClassDB::bind_method(D_METHOD("get_alignment"), &RiveTexture::get_alignment);
     ClassDB::bind_method(D_METHOD("set_state_machine", "state_machine"),
                          &RiveTexture::set_state_machine);
     ClassDB::bind_method(D_METHOD("get_state_machine"),
@@ -94,6 +99,12 @@ void RiveTexture::_bind_methods() {
                  "get_artboard");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "state_machine"),
                  "set_state_machine", "get_state_machine");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "fit", PROPERTY_HINT_ENUM,
+                              "Contain,Cover,Fill,Fit Width,Fit Height,None,Scale Down,Layout"),
+                 "set_fit", "get_fit");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "alignment", PROPERTY_HINT_ENUM,
+                              "Top Left,Top Center,Top Right,Center Left,Center,Center Right,Bottom Left,Bottom Center,Bottom Right"),
+                 "set_alignment", "get_alignment");
     ADD_PROPERTY(PropertyInfo(Variant::VECTOR2I, "render_size"),
                  "set_render_size", "get_render_size");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing"), "set_playing",
@@ -126,6 +137,19 @@ void RiveTexture::set_file(const Ref<RiveFileResource>& p_file) {
 
 void RiveTexture::set_artboard(const String& p_artboard) {
     rive.artboard = p_artboard;
+    recreate_instance();
+}
+
+void RiveTexture::set_fit(int p_fit) {
+    rive.fit = CLAMP(p_fit, 0, 7);
+    recreate_instance();
+}
+
+void RiveTexture::set_alignment(int p_alignment) {
+    alignment_index = CLAMP(p_alignment, 0, 8);
+    // 3x3 anchor grid -> [-1,1] per axis.
+    rive.alignment = godot::Vector2(float(alignment_index % 3) - 1.0f,
+                                    float(alignment_index / 3) - 1.0f);
     recreate_instance();
 }
 

@@ -89,9 +89,14 @@ void RiveInstance::create(const Vector2i& p_size) {
         const uint64_t ah = artboard_handle;
         const uint64_t sh = state_machine_handle;
         const Vector2i size = p_size;
-        queue->runOnce([server, id, fh, ah, sh, size](rive::CommandServer*) {
-            server->rt_init_instance(id, fh, ah, sh, size);
-        });
+        const int fit_mode = fit;
+        const Vector2 align = alignment;
+        queue->runOnce(
+            [server, id, fh, ah, sh, size, fit_mode, align](
+                rive::CommandServer*) {
+                server->rt_init_instance(id, fh, ah, sh, size, fit_mode,
+                                         align);
+            });
         server->request_pump();
     }
     // Replay inspector/script-set inputs and view-model properties onto the

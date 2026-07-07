@@ -238,6 +238,31 @@ Rive shines as UI *over* gameplay. The patterns:
   world-space bar, or a `RiveControl` in a `CanvasLayer` positioned each
   frame from `camera.unproject_position(entity.global_position)`.
 
+### Fit & alignment
+
+`fit` on every node (`RiveSprite2D`, `RiveControl`, `RiveTexture`) controls
+how the artboard maps to its texture — mirroring the Rive editor/other
+runtimes: `Contain` (default), `Cover`, `Fill`, `Fit Width`, `Fit Height`,
+`None`, `Scale Down`, and `Layout`. **Layout** resizes the artboard itself
+so its Rive layout (Yoga) reflows to the node's size — the mode to use for
+responsive full-screen UI ("fits any screen size"). `alignment` picks the
+anchor (9-grid) for modes that don't fill exactly. Pointer input and
+listener-aware hit testing invert the same transform, so clicks stay
+accurate in every mode.
+
+### Loaded signal
+
+Instance creation is asynchronous (queued to the render thread).
+`RiveSprite2D`/`RiveControl` emit `loaded` when the instance is live —
+the equivalent of rive-unity's `WidgetStatus.Loaded`:
+
+```gdscript
+rive_node.loaded.connect(func(): rive_node.set_property("health", 50.0))
+```
+
+(Property writes before `loaded` are safe — they're cached and replayed —
+but reads return values only after load.)
+
 ### Multitouch
 
 Touch input tracks per finger: `InputEventScreenTouch`/`ScreenDrag` forward
