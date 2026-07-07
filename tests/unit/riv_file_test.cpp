@@ -3,7 +3,10 @@
 #define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 
+#include "core/fallback_fonts.hpp"
 #include "core/riv_file.hpp"
+
+#include "rive/text_engine.hpp"
 
 #include "rive/animation/state_machine_instance.hpp"
 #include "rive/artboard.hpp"
@@ -179,6 +182,28 @@ TEST_CASE("out-of-band assets enumerate as unresolved (G3.6)") {
     }
     REQUIRE(walle);
     REQUIRE(eve);
+}
+
+TEST_CASE("fallback fonts register and serve rive's gFallbackProc (G5.1)") {
+    rivegd::core::clear_fallback_fonts();
+    auto bytes = read_file(
+        "thirdparty/rive-runtime/tests/unit_tests/assets/fonts/"
+        "Inter_18pt-Regular.ttf");
+    REQUIRE(rivegd::core::add_fallback_font(bytes.data(), bytes.size()));
+    REQUIRE(rivegd::core::fallback_font_count() == 1);
+    REQUIRE(rive::Font::gFallbackProc != nullptr);
+
+    // Iteration contract: index 0 serves the registered font; past-end
+    // returns null (rive walks indices until covered or null).
+    auto font = rive::Font::gFallbackProc(0x41, 0, nullptr);
+    REQUIRE(font != nullptr);
+    REQUIRE(rive::Font::gFallbackProc(0x41, 1, nullptr) == nullptr);
+
+    // Garbage data must be rejected without registering.
+    std::vector<uint8_t> garbage(64, 0xAB);
+    REQUIRE(!rivegd::core::add_fallback_font(garbage.data(), garbage.size()));
+    REQUIRE(rivegd::core::fallback_font_count() == 1);
+    rivegd::core::clear_fallback_fonts();
 }
 
 TEST_CASE("headless advance: instance a state machine and run it") {

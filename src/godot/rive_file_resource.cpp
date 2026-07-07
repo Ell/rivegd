@@ -1,5 +1,6 @@
 #include "godot/rive_file_resource.h"
 
+#include "core/fallback_fonts.hpp"
 #include "core/riv_file.hpp"
 
 #include "rive/command_queue.hpp"
@@ -140,6 +141,27 @@ void RiveFileResource::unref_shared_file(SharedFile* p_shared) {
     if (p_shared->refs == 0 && p_shared->retired) {
         destroy_shared_file(p_shared);
     }
+}
+
+bool RiveFileResource::add_fallback_font(const Variant& p_font) {
+    PackedByteArray bytes;
+    if (p_font.get_type() == Variant::PACKED_BYTE_ARRAY) {
+        bytes = p_font;
+    } else if (p_font.get_type() == Variant::OBJECT) {
+        Object* object = p_font;
+        // FontFile exposes its raw TTF/OTF via `data`.
+        if (object != nullptr && object->has_method("get_data")) {
+            bytes = object->call("get_data");
+        }
+    }
+    if (bytes.is_empty()) {
+        return false;
+    }
+    return core::add_fallback_font(bytes.ptr(), size_t(bytes.size()));
+}
+
+void RiveFileResource::clear_fallback_fonts() {
+    core::clear_fallback_fonts();
 }
 
 Array RiveFileResource::get_asset_descriptions() const {
@@ -297,6 +319,12 @@ void RiveFileResource::_bind_methods() {
                          &RiveFileResource::get_state_machine_names);
     ClassDB::bind_method(D_METHOD("get_asset_descriptions"),
                          &RiveFileResource::get_asset_descriptions);
+    ClassDB::bind_static_method("RiveFileResource",
+                                D_METHOD("add_fallback_font", "font"),
+                                &RiveFileResource::add_fallback_font);
+    ClassDB::bind_static_method("RiveFileResource",
+                                D_METHOD("clear_fallback_fonts"),
+                                &RiveFileResource::clear_fallback_fonts);
     ClassDB::bind_method(D_METHOD("get_animation_names", "artboard"),
                          &RiveFileResource::get_animation_names);
     ClassDB::bind_method(

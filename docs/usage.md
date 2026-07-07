@@ -213,6 +213,20 @@ for a in rive_file.get_asset_descriptions():
 
 `resolved=false` after load means the sibling file was missing.
 
+### Fallback fonts
+
+When a Rive text run needs a glyph its authored font lacks (CJK,
+localization, symbols), registered fallbacks are consulted in order —
+global, one line (rive-unity doesn't expose this yet):
+
+```gdscript
+RiveFileResource.add_fallback_font(load("res://fonts/NotoSansJP.ttf"))
+RiveFileResource.add_fallback_font(japanese_bytes)  # PackedByteArray works too
+```
+
+`RiveFileResource.clear_fallback_fonts()` resets. Register before loading
+text-bearing scenes; shaping picks fallbacks up on the next re-shape.
+
 ### Per-node audio routing
 
 By default every artboard's audio mixes into one shared stream (put a

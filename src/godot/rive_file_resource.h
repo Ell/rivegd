@@ -34,6 +34,12 @@ public:
     godot::String get_import_error() const { return import_error; }
 
     godot::PackedStringArray get_artboard_names() const;
+    // Fallback fonts (G5.1, global): consulted in registration order when
+    // an authored font misses a glyph. Accepts a FontFile or raw
+    // TTF/OTF bytes. Returns false when the data fails to decode.
+    static bool add_fallback_font(const godot::Variant& p_font);
+    static void clear_fallback_fonts();
+
     // Assets the file references: [{name, unique_name, unique_filename,
     // type, resolved}] — unresolved entries are out-of-band (GOALS G3.6).
     godot::Array get_asset_descriptions() const;

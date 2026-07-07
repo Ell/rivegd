@@ -70,7 +70,8 @@ C++ runtime and need no integration surface — we inherit the C++ column's
 - Caching Rive Files: ✅ closed — one refcounted queue import per
   resource; N instances of one .riv decode once (hot reload retires the
   old generation).
-- Parity-at-❌ (neither has it): Fallback Fonts (task #24), Semantics —
+- Fallback Fonts: ✅ we now EXCEED Unity here (they're ❌ in the matrix) —
+  global registry via RiveFileResource.add_fallback_font. Semantics —
   where CommandQueue's drainSemanticsDiff + Godot 4.7's AccessKit make an
   accessibility bridge a first-mover opportunity for us (task #25).
 - Unverified-by-fixture (believed working, runtime-core): N-slicing, RTL

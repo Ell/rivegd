@@ -27,6 +27,9 @@ run_unit() {
         -I"$ROOT/src" -I"$RIVE/include" \
         "$ROOT/src/core/riv_file.cpp" -o "$ROOT/out/tests/riv_file.o"
     g++ -std=c++17 -g -O1 -fno-rtti -c $RIVE_DEFS \
+        -I"$ROOT/src" -I"$RIVE/include" \
+        "$ROOT/src/core/fallback_fonts.cpp" -o "$ROOT/out/tests/fallback_fonts.o"
+    g++ -std=c++17 -g -O1 -fno-rtti -c $RIVE_DEFS \
         -I"$RIVE/include" \
         "$RIVE/utils/no_op_factory.cpp" -o "$ROOT/out/tests/no_op_factory.o"
     g++ -std=c++17 -g -O1 $RIVE_DEFS \
@@ -35,6 +38,7 @@ run_unit() {
         -I"$RIVE/tests/include" \
         "$ROOT/tests/unit/riv_file_test.cpp" \
         "$ROOT/out/tests/riv_file.o" \
+        "$ROOT/out/tests/fallback_fonts.o" \
         "$ROOT/out/tests/no_op_factory.o" \
         -L"$RIVE_OUT" -Wl,--start-group \
         -lrive_pls_renderer -lrive_decoders -lrive \
