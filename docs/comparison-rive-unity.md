@@ -30,7 +30,7 @@ runtime + Rive Renderer.
 
 | Feature | rive-unity status | rivegd status |
 |---|---|---|
-| **Luau scripting** | roadmap ("rolling out across the platform… Unity support follows") | ✅ shipped & behaviorally verified (editor-signed fixture drives a VM round-trip in CI) |
+| Luau scripting | ✅ shipped (v0.4.1+, per the official feature-support matrix — the Jan 2026 blog's "rolling out" is stale) | ✅ shipped — parity; ours is uniquely *behaviorally verified* in CI (editor-signed fixture drives a VM round-trip) |
 | **Keyboard input + focus** | roadmap ("improved key and gamepad detection") | ✅ shipped (key forwarding, focus_next/previous, focus test in smoke) |
 | **Text input** (typing into Rive UI) | roadmap ("building text input support") | ✅ `send_text_input` shipped |
 | **Gamepad → Rive** | roadmap | ✅ wire-v2 batching, SDL→W3C remap, CI-tested |
@@ -54,6 +54,26 @@ runtime + Rive Renderer.
 | Scrolling + virtualization, N-slicing | ✅ advertised | untested (authored in Rive; runtime plumbing exists — needs fixtures/verification) |
 
 Both sides list texture compression and consoles as future.
+
+## Row-by-row vs the official matrix (rive.app/docs/feature-support)
+
+Verified July 2026 against the Unity column. Runtime-core rows (mesh
+deformation, follow path, joysticks, solos, interpolation/speed on states,
+graph editor, randomization, N-slicing, RTL text) come with the embedded
+C++ runtime and need no integration surface — we inherit the C++ column's
+✅. Integration-surface rows verified individually:
+
+- At parity or better: 17/20 rows (data binding incl. lists/images/
+  artboards, text, layouts, feathering, audio, scripting, events,
+  listeners, raster assets, caching-of-resources…).
+- **Real gap: Out-of-Band Assets** (Unity ✅ / us ❌) — task #14.
+- **Partial: Caching Rive Files** — Godot caches the resource; each
+  instance still re-imports (loadFile per create). Task #23.
+- Parity-at-❌ (neither has it): Fallback Fonts (task #24), Semantics —
+  where CommandQueue's drainSemanticsDiff + Godot 4.7's AccessKit make an
+  accessibility bridge a first-mover opportunity for us (task #25).
+- Unverified-by-fixture (believed working, runtime-core): N-slicing, RTL
+  text — covered by task #17's MCP-authored fixtures.
 
 ## Read on the standings
 

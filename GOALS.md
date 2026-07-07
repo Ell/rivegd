@@ -103,8 +103,12 @@ rive-unity (Rive's first-party Unity runtime):
    rendering API, RenderTexture→image binding, texture compression
    (roadmap for rive-unity too).
 
-Already ahead of rive-unity (keep green): Luau scripting (verified),
-keyboard/focus/text input, gamepad, ordering guarantees, headless.
+Already ahead of rive-unity (keep green): keyboard/focus/text input,
+gamepad, ordering guarantees, headless, behavioral script verification.
+(Unity ships scripting too as of v0.4.1 — parity there, not a lead.)
+Also tracked from the official feature-support matrix: file-handle caching
+(partial for us), fallback fonts (parity-❌), semantics/AccessKit bridge
+(first-mover opportunity).
 
 ## Non-goals (scope discipline)
 
