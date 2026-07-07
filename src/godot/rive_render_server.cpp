@@ -12,11 +12,13 @@
 #include "rive/viewmodel/runtime/viewmodel_instance_boolean_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_color_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_enum_runtime.hpp"
+#include "rive/viewmodel/runtime/viewmodel_instance_list_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_number_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_string_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_trigger_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_value_runtime.hpp"
+#include "rive/viewmodel/runtime/viewmodel_runtime.hpp"
 #include "rive/viewmodel/viewmodel_instance.hpp"
 
 #include <godot_cpp/templates/local_vector.hpp>
@@ -92,6 +94,11 @@ static Variant read_vm_property(rive::ViewModelInstanceValueRuntime* value) {
         case rive::DataType::trigger:
             // Triggers carry no value; reported as fired.
             return true;
+        case rive::DataType::list:
+            // Lists report their size.
+            return static_cast<int64_t>(
+                static_cast<rive::ViewModelInstanceListRuntime*>(value)
+                    ->size());
         default:
             return Variant();
     }
@@ -651,6 +658,52 @@ void RiveRenderServer::rt_fire_vm_trigger(int64_t p_instance_id,
     }
 }
 
+// Sets a scalar property on an arbitrary VM instance, dispatched by the
+// Variant's type (shared by top-level and list-item writes).
+static void set_vm_value(rive::ViewModelInstanceRuntime* vm,
+                         const String& p_path, const Variant& p_value) {
+    if (vm == nullptr) {
+        return;
+    }
+    const std::string path = p_path.utf8().get_data();
+    switch (p_value.get_type()) {
+        case Variant::BOOL:
+            if (auto* b = vm->propertyBoolean(path)) {
+                b->value(bool(p_value));
+            }
+            break;
+        case Variant::INT:
+        case Variant::FLOAT:
+            if (auto* n = vm->propertyNumber(path)) {
+                n->value(float(double(p_value)));
+            }
+            break;
+        case Variant::STRING:
+        case Variant::STRING_NAME:
+            if (auto* str = vm->propertyString(path)) {
+                str->value(String(p_value).utf8().get_data());
+            } else if (auto* e = vm->propertyEnum(path)) {
+                e->value(String(p_value).utf8().get_data());
+            }
+            break;
+        case Variant::COLOR: {
+            const Color color = p_value;
+            if (auto* c = vm->propertyColor(path)) {
+                c->argb(int(color.a * 255.0f), int(color.r * 255.0f),
+                        int(color.g * 255.0f), int(color.b * 255.0f));
+            }
+        } break;
+        default:
+            break;
+    }
+}
+
+static rive::ViewModelInstanceListRuntime* resolve_list(
+    RiveRenderServer* /*unused*/, rive::ViewModelInstanceRuntime* vm,
+    const String& p_path) {
+    return vm != nullptr ? vm->propertyList(p_path.utf8().get_data()) : nullptr;
+}
+
 void RiveRenderServer::rt_watch_vm_property(int64_t p_instance_id,
                                             const String& p_path) {
     Instance** found = instances.getptr(p_instance_id);
@@ -681,6 +734,9 @@ void RiveRenderServer::rt_watch_vm_property(int64_t p_instance_id,
     if (value == nullptr) {
         value = instance->view_model->propertyEnum(path);
     }
+    if (value == nullptr) {
+        value = instance->view_model->propertyList(path);
+    }
     bool is_trigger = false;
     if (value == nullptr) {
         value = instance->view_model->propertyTrigger(path);
@@ -704,6 +760,99 @@ void RiveRenderServer::rt_watch_vm_property(int64_t p_instance_id,
     change["value"] = read_vm_property(value);
     std::lock_guard<std::mutex> lock(mailbox_mutex);
     property_mailbox[p_instance_id].push_back(change);
+}
+
+void RiveRenderServer::rt_list_append(int64_t p_instance_id,
+                                      const String& p_path,
+                                      const String& p_view_model,
+                                      const String& p_instance_name) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr) {
+        return;
+    }
+    Instance* instance = *found;
+    instance->settled = false;
+    instance->needs_render = true;
+    auto* list = resolve_list(this, instance->view_model.get(), p_path);
+    if (list == nullptr) {
+        ERR_PRINT("rivegd: list property not found: " + p_path);
+        return;
+    }
+    rive::ViewModelRuntime* view_model =
+        instance->file->viewModelByName(p_view_model.utf8().get_data());
+    if (view_model == nullptr) {
+        ERR_PRINT("rivegd: view model not found: " + p_view_model);
+        return;
+    }
+    rive::rcp<rive::ViewModelInstanceRuntime> item =
+        p_instance_name.is_empty()
+            ? view_model->createInstance()
+            : view_model->createInstanceFromName(
+                  p_instance_name.utf8().get_data());
+    if (item == nullptr) {
+        ERR_PRINT("rivegd: could not create instance of " + p_view_model);
+        return;
+    }
+    list->addInstance(item.get());
+}
+
+void RiveRenderServer::rt_list_remove_at(int64_t p_instance_id,
+                                         const String& p_path, int p_index) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr) {
+        return;
+    }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
+    if (auto* list = resolve_list(this, (*found)->view_model.get(), p_path)) {
+        list->removeInstanceAt(p_index);
+    }
+}
+
+void RiveRenderServer::rt_list_swap(int64_t p_instance_id,
+                                    const String& p_path, int p_a, int p_b) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr) {
+        return;
+    }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
+    if (auto* list = resolve_list(this, (*found)->view_model.get(), p_path)) {
+        if (p_a >= 0 && p_b >= 0 && size_t(p_a) < list->size() &&
+            size_t(p_b) < list->size()) {
+            list->swap(uint32_t(p_a), uint32_t(p_b));
+        }
+    }
+}
+
+void RiveRenderServer::rt_list_clear(int64_t p_instance_id,
+                                     const String& p_path) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr) {
+        return;
+    }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
+    if (auto* list = resolve_list(this, (*found)->view_model.get(), p_path)) {
+        list->removeAllInstances();
+    }
+}
+
+void RiveRenderServer::rt_list_set(int64_t p_instance_id, const String& p_path,
+                                   int p_index, const String& p_sub_path,
+                                   const Variant& p_value) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr) {
+        return;
+    }
+    (*found)->settled = false;
+    (*found)->needs_render = true;
+    auto* list = resolve_list(this, (*found)->view_model.get(), p_path);
+    if (list == nullptr || p_index < 0 || size_t(p_index) >= list->size()) {
+        return;
+    }
+    rive::rcp<rive::ViewModelInstanceRuntime> item = list->instanceAt(p_index);
+    set_vm_value(item.get(), p_sub_path, p_value);
 }
 
 Ref<Image> RiveRenderServer::render_thumbnail(const PackedByteArray& p_data,

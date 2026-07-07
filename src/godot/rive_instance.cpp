@@ -172,6 +172,40 @@ Array RiveInstance::take_property_changes() {
     return changes;
 }
 
+#define RIVEGD_POST(METHOD, ...)                                              \
+    do {                                                                       \
+        RiveRenderServer* server = RiveRenderServer::get_singleton();          \
+        if (server == nullptr || instance_id == 0) {                           \
+            return;                                                            \
+        }                                                                      \
+        RenderingServer::get_singleton()->call_on_render_thread(               \
+            callable_mp(server, &RiveRenderServer::METHOD)                     \
+                .bind(instance_id, __VA_ARGS__));                              \
+    } while (0)
+
+void RiveInstance::list_append(const String& p_path, const String& p_view_model,
+                               const String& p_instance_name) {
+    RIVEGD_POST(rt_list_append, p_path, p_view_model, p_instance_name);
+}
+
+void RiveInstance::list_remove_at(const String& p_path, int p_index) {
+    RIVEGD_POST(rt_list_remove_at, p_path, p_index);
+}
+
+void RiveInstance::list_swap(const String& p_path, int p_a, int p_b) {
+    RIVEGD_POST(rt_list_swap, p_path, p_a, p_b);
+}
+
+void RiveInstance::list_clear(const String& p_path) {
+    RIVEGD_POST(rt_list_clear, p_path);
+}
+
+void RiveInstance::list_set_property(const String& p_path, int p_index,
+                                     const String& p_sub_path,
+                                     const Variant& p_value) {
+    RIVEGD_POST(rt_list_set, p_path, p_index, p_sub_path, p_value);
+}
+
 void RiveInstance::fire_property_trigger(const String& p_path) {
     RiveRenderServer* server = RiveRenderServer::get_singleton();
     if (server == nullptr || instance_id == 0) {

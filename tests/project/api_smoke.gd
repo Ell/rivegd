@@ -185,8 +185,39 @@ func _process(_delta: float) -> void:
 			fail("trigger fire not observed (changes: %s)" % [property_changes])
 			return
 		print("enum+trigger changes: ", property_changes)
+		_start_list_phase()
+	elif frames == 470:
+		var size_changes: Array = []
+		for change in property_changes:
+			if change[0] == "Test List":
+				size_changes.push_back(int(change[1]))
+		# Baseline (fixture pre-populates the list), then +1 from our append.
+		if size_changes.size() < 2 \
+				or size_changes[-1] != size_changes[0] + 1:
+			fail("unexpected list size changes: %s" % [size_changes])
+			return
+		vm_sprite.list_clear("Test List")
+	elif frames == 500:
+		if int(vm_sprite.get_property("Test List")) != 0:
+			fail("list_clear did not empty the list (size %s)" %
+					[vm_sprite.get_property("Test List")])
+			return
+		print("list size after ops: ", vm_sprite.get_property("Test List"))
 		print("API SMOKE OK")
 		get_tree().quit(0)
+
+
+func _start_list_phase() -> void:
+	vm_sprite.queue_free()
+	vm_sprite = RiveSprite2D.new()
+	vm_sprite.file = load("res://fixtures/data_bind_test_cmdq.riv")
+	vm_sprite.artboard = "Test Artboard"
+	add_child(vm_sprite)
+	property_changes.clear()
+	vm_sprite.property_changed.connect(func(path, value):
+		property_changes.push_back([path, value]))
+	vm_sprite.watch_property("Test List")
+	vm_sprite.list_append("Test List", "Test All")
 
 
 var vm_sprite: RiveSprite2D

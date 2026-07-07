@@ -95,6 +95,23 @@ public:
     void rt_watch_vm_property(int64_t p_instance_id,
                               const godot::String& p_path);
 
+    // List properties (path-addressed; items are view-model instances).
+    // List state lives on the render thread and does not survive instance
+    // rebuilds (no replay for structural ops).
+    void rt_list_append(int64_t p_instance_id, const godot::String& p_path,
+                        const godot::String& p_view_model,
+                        const godot::String& p_instance_name);
+    void rt_list_remove_at(int64_t p_instance_id, const godot::String& p_path,
+                           int p_index);
+    void rt_list_swap(int64_t p_instance_id, const godot::String& p_path,
+                      int p_a, int p_b);
+    void rt_list_clear(int64_t p_instance_id, const godot::String& p_path);
+    // Sets a property on the list item at p_index (Variant-dispatched like
+    // rt_set_vm_*).
+    void rt_list_set(int64_t p_instance_id, const godot::String& p_path,
+                     int p_index, const godot::String& p_sub_path,
+                     const godot::Variant& p_value);
+
     // Blocking render for editor thumbnails: safe to call from any
     // non-render thread (the editor's preview thread); posts a one-shot
     // render to the render thread and waits (with timeout).

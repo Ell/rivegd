@@ -110,7 +110,11 @@ std::unique_ptr<RivFile> RivFile::import(const uint8_t* data,
                         case rive::DataType::color:   type = "color";   break;
                         case rive::DataType::trigger: type = "trigger"; break;
                         case rive::DataType::enumType: type = "enum";   break;
-                        default: break; // nested VMs/lists: not yet exposed
+                        case rive::DataType::list: type = "list"; break;
+                        case rive::DataType::viewModel:
+                            type = "viewModel";
+                            break;
+                        default: break; // images/artboards: script-only
                     }
                     if (type != nullptr) {
                         VmPropertyMeta property_meta;

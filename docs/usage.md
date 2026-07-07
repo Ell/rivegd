@@ -96,6 +96,20 @@ print($HUD.get_property("stats/health"))   # last value seen
 Values set from script or the inspector are cached and re-applied when the
 instance rebuilds (file swap, resize, hot reload); watches re-arm too.
 
+Lists hold view-model instances; watch the list path to observe its size:
+
+```gdscript
+$HUD.watch_property("inventory")                  # size changes via property_changed
+$HUD.list_append("inventory", "ItemVM")           # instance of a named view model
+$HUD.list_set_property("inventory", 0, "label", "Sword")
+$HUD.list_swap("inventory", 0, 1)
+$HUD.list_remove_at("inventory", 0)
+$HUD.list_clear("inventory")
+```
+
+Structural list state lives on the render thread and does not survive
+instance rebuilds.
+
 ### Events & state changes
 
 Rive events surface as a signal with custom properties as a Dictionary;

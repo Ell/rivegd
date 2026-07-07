@@ -46,6 +46,17 @@ void RiveControl::_bind_methods() {
                          &RiveControl::watch_property);
     ClassDB::bind_method(D_METHOD("get_property", "path"),
                          &RiveControl::get_property);
+    ClassDB::bind_method(
+        D_METHOD("list_append", "path", "view_model", "instance_name"),
+        &RiveControl::list_append, DEFVAL(String()));
+    ClassDB::bind_method(D_METHOD("list_remove_at", "path", "index"),
+                         &RiveControl::list_remove_at);
+    ClassDB::bind_method(D_METHOD("list_swap", "path", "a", "b"),
+                         &RiveControl::list_swap);
+    ClassDB::bind_method(D_METHOD("list_clear", "path"), &RiveControl::list_clear);
+    ClassDB::bind_method(
+        D_METHOD("list_set_property", "path", "index", "sub_path", "value"),
+        &RiveControl::list_set_property);
 
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "file",
                               PROPERTY_HINT_RESOURCE_TYPE, "RiveFileResource"),
@@ -142,6 +153,29 @@ void RiveControl::watch_property(const String& p_path) {
 
 Variant RiveControl::get_property(const String& p_path) const {
     return rive.get_property(p_path);
+}
+
+void RiveControl::list_append(const String& p_path, const String& p_view_model,
+                        const String& p_instance_name) {
+    rive.list_append(p_path, p_view_model, p_instance_name);
+}
+
+void RiveControl::list_remove_at(const String& p_path, int p_index) {
+    rive.list_remove_at(p_path, p_index);
+}
+
+void RiveControl::list_swap(const String& p_path, int p_a, int p_b) {
+    rive.list_swap(p_path, p_a, p_b);
+}
+
+void RiveControl::list_clear(const String& p_path) {
+    rive.list_clear(p_path);
+}
+
+void RiveControl::list_set_property(const String& p_path, int p_index,
+                              const String& p_sub_path,
+                              const Variant& p_value) {
+    rive.list_set_property(p_path, p_index, p_sub_path, p_value);
 }
 
 Vector2 RiveControl::_get_minimum_size() const {

@@ -52,6 +52,18 @@ public:
     void watch_property(const godot::String& p_path);
     godot::Variant get_property(const godot::String& p_path) const;
     godot::Array take_property_changes();
+
+    // List properties. Structural ops are render-thread state and do not
+    // survive instance rebuilds; watch the list path to observe its size.
+    void list_append(const godot::String& p_path,
+                     const godot::String& p_view_model,
+                     const godot::String& p_instance_name);
+    void list_remove_at(const godot::String& p_path, int p_index);
+    void list_swap(const godot::String& p_path, int p_a, int p_b);
+    void list_clear(const godot::String& p_path);
+    void list_set_property(const godot::String& p_path, int p_index,
+                           const godot::String& p_sub_path,
+                           const godot::Variant& p_value);
     void pointer(int p_phase, const godot::Vector2& p_local,
                  const godot::Vector2& p_node_size);
 
