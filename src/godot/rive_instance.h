@@ -24,6 +24,10 @@ public:
     // create(); changing them on a node recreates the instance.
     int fit = 0;
     godot::Vector2 alignment;
+    // FIT_LAYOUT content scale: artboard is laid out at node_size/scale
+    // and drawn scaled up (Unity "Layout Scale Factor"; constant-physical
+    // DPI = DisplayServer.screen_get_dpi() / your reference DPI).
+    double layout_scale = 1.0;
     // Create a dedicated AudioEngine for this instance (per-node bus
     // routing): pair with RiveAudioStream.instance_id = get_instance_id().
     bool dedicated_audio = false;

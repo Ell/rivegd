@@ -29,6 +29,10 @@ void RiveControl::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_alignment", "alignment"),
                          &RiveControl::set_alignment);
     ClassDB::bind_method(D_METHOD("get_alignment"), &RiveControl::get_alignment);
+    ClassDB::bind_method(D_METHOD("set_layout_scale", "scale"),
+                         &RiveControl::set_layout_scale);
+    ClassDB::bind_method(D_METHOD("get_layout_scale"),
+                         &RiveControl::get_layout_scale);
     ClassDB::bind_method(D_METHOD("set_state_machine", "state_machine"),
                          &RiveControl::set_state_machine);
     ClassDB::bind_method(D_METHOD("get_state_machine"),
@@ -123,6 +127,9 @@ void RiveControl::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::INT, "alignment", PROPERTY_HINT_ENUM,
                               "Top Left,Top Center,Top Right,Center Left,Center,Center Right,Bottom Left,Bottom Center,Bottom Right"),
                  "set_alignment", "get_alignment");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "layout_scale",
+                              PROPERTY_HINT_RANGE, "0.25,4,0.01,or_greater"),
+                 "set_layout_scale", "get_layout_scale");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing"), "set_playing",
                  "is_playing");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "pause_when_hidden"),
@@ -214,6 +221,11 @@ void RiveControl::set_alignment(int p_alignment) {
     // 3x3 anchor grid -> [-1,1] per axis.
     rive.alignment = godot::Vector2(float(alignment_index % 3) - 1.0f,
                                     float(alignment_index / 3) - 1.0f);
+    recreate_instance();
+}
+
+void RiveControl::set_layout_scale(double p_scale) {
+    rive.layout_scale = MAX(0.01, p_scale);
     recreate_instance();
 }
 

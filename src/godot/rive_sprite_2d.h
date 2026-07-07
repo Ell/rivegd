@@ -28,6 +28,8 @@ public:
     int get_fit() const { return rive.fit; }
     void set_alignment(int p_alignment);
     int get_alignment() const { return alignment_index; }
+    void set_layout_scale(double p_scale);
+    double get_layout_scale() const { return rive.layout_scale; }
 
     void set_state_machine(const godot::String& p_state_machine);
     godot::String get_state_machine() const { return rive.state_machine; }

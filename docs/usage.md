@@ -263,6 +263,12 @@ anchor (9-grid) for modes that don't fill exactly. Pointer input and
 listener-aware hit testing invert the same transform, so clicks stay
 accurate in every mode.
 
+With `fit = Layout`, `layout_scale` sets the content scale (Unity's
+"Layout Scale Factor"): the artboard is laid out at `size / layout_scale`
+and drawn scaled up. DPI recipes: constant pixel size = leave at 1.0;
+constant physical size = `DisplayServer.screen_get_dpi() / 160.0` (or your
+reference DPI), updated on window/screen change.
+
 ### Loaded signal
 
 Instance creation is asynchronous (queued to the render thread).

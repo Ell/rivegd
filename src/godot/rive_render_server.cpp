@@ -81,6 +81,7 @@ struct RiveRenderServer::Instance {
     int fit = 0;              // RiveRenderServer::FitMode
     float align_x = 0.0f;     // [-1, 1]
     float align_y = 0.0f;
+    float layout_scale = 1.0f;
     bool valid = false;
 
     // Sleep bookkeeping (GOALS G4.6): when the machine reports it settled
@@ -273,7 +274,7 @@ struct FitTransform {
 };
 static FitTransform compute_fit(int fit, float align_x, float align_y,
                                 float ab_w, float ab_h, float tex_w,
-                                float tex_h) {
+                                float tex_h, float layout_scale = 1.0f) {
     FitTransform out;
     switch (fit) {
         case RiveRenderServer::FIT_FILL:
@@ -297,7 +298,10 @@ static FitTransform compute_fit(int fit, float align_x, float align_y,
                 MIN(1.0f, MIN(tex_w / ab_w, tex_h / ab_h));
             break;
         case RiveRenderServer::FIT_LAYOUT:
-            return out; // identity: artboard tracks the texture size
+            // Artboard is sized texture/layout_scale upstream; draw scaled
+            // back up so content renders at layout_scale x.
+            out.sx = out.sy = MAX(0.01f, layout_scale);
+            return out;
         case RiveRenderServer::FIT_CONTAIN:
         default:
             out.sx = out.sy = MIN(tex_w / ab_w, tex_h / ab_h);
@@ -375,7 +379,8 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
                                         uint64_t p_state_machine_handle,
                                         const Vector2i& p_size, int p_fit,
                                         const Vector2& p_alignment,
-                                        bool p_dedicated_audio) {
+                                        bool p_dedicated_audio,
+                                        float p_layout_scale) {
     // The queue's loadFile/instantiate* commands ran earlier in this pump
     // (FIFO); the CommandServer owns the objects — we resolve and hold raw
     // pointers, releasing via queue deletes ordered after rt_free_instance.
@@ -386,6 +391,7 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
     instance->fit = p_fit;
     instance->align_x = p_alignment.x;
     instance->align_y = p_alignment.y;
+    instance->layout_scale = MAX(0.01f, p_layout_scale);
     instance->file_handle = reinterpret_cast<rive::FileHandle>(p_file_handle);
     instance->artboard_handle =
         reinterpret_cast<rive::ArtboardHandle>(p_artboard_handle);
@@ -406,8 +412,10 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
     // FIT_LAYOUT: the artboard itself resizes to the texture, so its Rive
     // layout (Yoga) reflows — same mechanism as the queue's setArtboardSize.
     if (instance->fit == FIT_LAYOUT) {
-        instance->artboard->width(float(instance->size.x));
-        instance->artboard->height(float(instance->size.y));
+        instance->artboard->width(float(instance->size.x) /
+                                  instance->layout_scale);
+        instance->artboard->height(float(instance->size.y) /
+                                   instance->layout_scale);
     }
 
     // Data binding: create the instance through the ViewModelRuntime factory
@@ -649,7 +657,8 @@ void RiveRenderServer::rt_render_instance(int64_t p_instance_id,
     const FitTransform fit = compute_fit(
         instance->fit, instance->align_x, instance->align_y,
         instance->artboard->width(), instance->artboard->height(),
-        float(instance->size.x), float(instance->size.y));
+        float(instance->size.x), float(instance->size.y),
+        instance->layout_scale);
     renderer.transform(rive::Mat2D(fit.sx, 0, 0, fit.sy, fit.tx, fit.ty));
     instance->artboard->draw(&renderer);
     renderer.restore();
@@ -799,7 +808,8 @@ void RiveRenderServer::rt_pointer(int64_t p_instance_id, int p_phase,
     const FitTransform fit = compute_fit(
         instance->fit, instance->align_x, instance->align_y,
         instance->artboard->width(), instance->artboard->height(),
-        float(instance->size.x), float(instance->size.y));
+        float(instance->size.x), float(instance->size.y),
+        instance->layout_scale);
     const rive::Vec2D position((texture_x - fit.tx) / fit.sx,
                                (texture_y - fit.ty) / fit.sy);
 
@@ -1282,7 +1292,8 @@ bool RiveRenderServer::hit_test(int64_t p_instance_id,
     const FitTransform fit = compute_fit(
         instance->fit, instance->align_x, instance->align_y,
         instance->artboard->width(), instance->artboard->height(),
-        float(instance->size.x), float(instance->size.y));
+        float(instance->size.x), float(instance->size.y),
+        instance->layout_scale);
     const rive::Vec2D position((texture_x - fit.tx) / fit.sx,
                                (texture_y - fit.ty) / fit.sy);
     return instance->state_machine->hitTest(position);

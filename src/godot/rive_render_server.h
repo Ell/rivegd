@@ -89,7 +89,7 @@ public:
                           uint64_t p_state_machine_handle,
                           const godot::Vector2i& p_size, int p_fit,
                           const godot::Vector2& p_alignment,
-                          bool p_dedicated_audio);
+                          bool p_dedicated_audio, float p_layout_scale);
     void rt_frame(int64_t p_instance_id, double p_delta); // advance only
     // Renders every instance that needs it in one batch (one submission).
     // Posted once per engine frame from the frame_pre_draw hook.

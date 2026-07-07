@@ -92,11 +92,12 @@ void RiveInstance::create(const Vector2i& p_size) {
         const int fit_mode = fit;
         const Vector2 align = alignment;
         const bool own_audio = dedicated_audio;
+        const float lscale = float(layout_scale);
         queue->runOnce(
-            [server, id, fh, ah, sh, size, fit_mode, align, own_audio](
-                rive::CommandServer*) {
+            [server, id, fh, ah, sh, size, fit_mode, align, own_audio,
+             lscale](rive::CommandServer*) {
                 server->rt_init_instance(id, fh, ah, sh, size, fit_mode,
-                                         align, own_audio);
+                                         align, own_audio, lscale);
             });
         server->request_pump();
     }
