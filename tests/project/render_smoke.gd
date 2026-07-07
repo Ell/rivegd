@@ -36,6 +36,18 @@ func _process(_delta: float) -> void:
 			push_error("RENDER SMOKE FAIL: could not save screenshot")
 			get_tree().quit(1)
 			return
+		# Content assertion: a frame that is one flat color means nothing
+		# rendered (this exact failure shipped once — never again).
+		var probe := img.get_pixel(200, 200)
+		var flat := true
+		for x in range(100, 500, 40):
+			for y in range(100, 500, 40):
+				if img.get_pixel(x, y) != probe:
+					flat = false
+		if flat:
+			push_error("RENDER SMOKE FAIL: frame is a flat color — no content")
+			get_tree().quit(1)
+			return
 		print("RENDER SMOKE OK -> ", out_path)
 		if frames == 300:
 			get_tree().quit(0)

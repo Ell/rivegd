@@ -2,13 +2,37 @@
 
 #include "godot/rive_render_server.h"
 
+#include "rive/command_queue.hpp"
+
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
+
+#include <tuple>
 #include <godot_cpp/classes/texture2d.hpp>
 
 using namespace godot;
 
 namespace rivegd {
+
+#define RIVEGD_POST(METHOD, ...)                                              \
+    do {                                                                       \
+        RiveRenderServer* server = RiveRenderServer::get_singleton();          \
+        if (server == nullptr || instance_id == 0) {                           \
+            return;                                                            \
+        }                                                                      \
+        const int64_t rivegd_id = instance_id;                                 \
+        server->request_pump();                                                \
+        server->queue()->runOnce(                                              \
+            [server, rivegd_id, args = std::make_tuple(__VA_ARGS__)](          \
+                rive::CommandServer*) {                                        \
+                std::apply(                                                    \
+                    [server, rivegd_id](auto&&... a) {                         \
+                        server->METHOD(rivegd_id,                              \
+                                       std::forward<decltype(a)>(a)...);       \
+                    },                                                         \
+                    args);                                                     \
+            });                                                                \
+    } while (0)
 
 static const char* kInputPrefix = "inputs/";
 static const char* kPropertyPrefix = "data_binding/";
@@ -23,10 +47,44 @@ void RiveInstance::create(const Vector2i& p_size) {
         return;
     }
     instance_id = server->allocate_instance_id();
-    RenderingServer::get_singleton()->call_on_render_thread(
-        callable_mp(server, &RiveRenderServer::rt_init_instance)
-            .bind(instance_id, file->get_data(), artboard, state_machine,
-                  p_size));
+
+    // M1: lifecycle through CommandQueue handles. The queue is one FIFO, so
+    // loadFile -> instantiate -> our init closure -> replayed values keep
+    // their order; the server pumps it on the render thread each frame.
+    rive::CommandQueue* queue = server->queue();
+    const PackedByteArray bytes = file->get_data();
+    file_handle = reinterpret_cast<uint64_t>(queue->loadFile(
+        std::vector<uint8_t>(bytes.ptr(), bytes.ptr() + bytes.size())));
+    artboard_handle = reinterpret_cast<uint64_t>(queue->instantiateArtboardNamed(
+        reinterpret_cast<rive::FileHandle>(file_handle),
+        artboard.utf8().get_data()));
+    // Empty name historically meant "first state machine"; the queue's ""
+    // means the artboard's *designated* default, which many files lack.
+    // Resolve the first machine's name from metadata to keep the old
+    // semantics deterministic.
+    String machine_name = state_machine;
+    if (machine_name.is_empty()) {
+        const PackedStringArray machines =
+            file->get_state_machine_names(artboard);
+        if (!machines.is_empty()) {
+            machine_name = machines[0];
+        }
+    }
+    state_machine_handle =
+        reinterpret_cast<uint64_t>(queue->instantiateStateMachineNamed(
+            reinterpret_cast<rive::ArtboardHandle>(artboard_handle),
+            machine_name.utf8().get_data()));
+    {
+        const int64_t id = instance_id;
+        const uint64_t fh = file_handle;
+        const uint64_t ah = artboard_handle;
+        const uint64_t sh = state_machine_handle;
+        const Vector2i size = p_size;
+        queue->runOnce([server, id, fh, ah, sh, size](rive::CommandServer*) {
+            server->rt_init_instance(id, fh, ah, sh, size);
+        });
+        server->request_pump();
+    }
     // Replay inspector/script-set inputs and view-model properties onto the
     // fresh instance.
     for (const KeyValue<String, Variant>& entry : input_values) {
@@ -47,11 +105,23 @@ void RiveInstance::release() {
     }
     RiveRenderServer* server = RiveRenderServer::get_singleton();
     if (server != nullptr) {
-        RenderingServer::get_singleton()->call_on_render_thread(
-            callable_mp(server, &RiveRenderServer::rt_free_instance)
-                .bind(instance_id));
+        rive::CommandQueue* queue = server->queue();
+        const int64_t id = instance_id;
+        queue->runOnce([server, id](rive::CommandServer*) {
+            server->rt_free_instance(id);
+        });
+        // Object teardown strictly after our last use (FIFO).
+        queue->deleteStateMachine(
+            reinterpret_cast<rive::StateMachineHandle>(state_machine_handle));
+        queue->deleteArtboard(
+            reinterpret_cast<rive::ArtboardHandle>(artboard_handle));
+        queue->deleteFile(reinterpret_cast<rive::FileHandle>(file_handle));
+        server->request_pump();
     }
     instance_id = 0;
+    file_handle = 0;
+    artboard_handle = 0;
+    state_machine_handle = 0;
     texture_bound = false;
     canvas_texture = RID();
     rd_texture = RID();
@@ -62,9 +132,11 @@ void RiveInstance::frame(double p_delta) {
         return;
     }
     RiveRenderServer* server = RiveRenderServer::get_singleton();
-    RenderingServer::get_singleton()->call_on_render_thread(
-        callable_mp(server, &RiveRenderServer::rt_frame)
-            .bind(instance_id, p_delta));
+    const int64_t id = instance_id;
+    server->queue()->runOnce([server, id, p_delta](rive::CommandServer*) {
+        server->rt_frame(id, p_delta);
+    });
+    server->request_pump();
 }
 
 bool RiveInstance::update_texture_binding() {
@@ -101,29 +173,20 @@ void RiveInstance::post_property(const String& p_path, const Variant& p_value) {
     if (server == nullptr || instance_id == 0) {
         return;
     }
-    RenderingServer* rs = RenderingServer::get_singleton();
     switch (p_value.get_type()) {
         case Variant::BOOL:
-            rs->call_on_render_thread(
-                callable_mp(server, &RiveRenderServer::rt_set_vm_bool)
-                    .bind(instance_id, p_path, bool(p_value)));
+            RIVEGD_POST(rt_set_vm_bool, p_path, bool(p_value));
             break;
         case Variant::INT:
         case Variant::FLOAT:
-            rs->call_on_render_thread(
-                callable_mp(server, &RiveRenderServer::rt_set_vm_number)
-                    .bind(instance_id, p_path, double(p_value)));
+            RIVEGD_POST(rt_set_vm_number, p_path, double(p_value));
             break;
         case Variant::STRING:
         case Variant::STRING_NAME:
-            rs->call_on_render_thread(
-                callable_mp(server, &RiveRenderServer::rt_set_vm_string)
-                    .bind(instance_id, p_path, String(p_value)));
+            RIVEGD_POST(rt_set_vm_string, p_path, String(p_value));
             break;
         case Variant::COLOR:
-            rs->call_on_render_thread(
-                callable_mp(server, &RiveRenderServer::rt_set_vm_color)
-                    .bind(instance_id, p_path, Color(p_value)));
+            RIVEGD_POST(rt_set_vm_color, p_path, Color(p_value));
             break;
         case Variant::OBJECT: {
             // Image properties accept a Godot Image or Texture2D; encode to
@@ -141,9 +204,7 @@ void RiveInstance::post_property(const String& p_path, const Variant& p_value) {
                           p_path + "'");
                 return;
             }
-            rs->call_on_render_thread(
-                callable_mp(server, &RiveRenderServer::rt_set_vm_image)
-                    .bind(instance_id, p_path, image->save_png_to_buffer()));
+            RIVEGD_POST(rt_set_vm_image, p_path, image->save_png_to_buffer());
         } break;
         default:
             ERR_PRINT("rivegd: unsupported view-model property type for '" +
@@ -158,13 +219,7 @@ void RiveInstance::set_property(const String& p_path, const Variant& p_value) {
 }
 
 void RiveInstance::post_watch(const String& p_path) {
-    RiveRenderServer* server = RiveRenderServer::get_singleton();
-    if (server == nullptr || instance_id == 0) {
-        return;
-    }
-    RenderingServer::get_singleton()->call_on_render_thread(
-        callable_mp(server, &RiveRenderServer::rt_watch_vm_property)
-            .bind(instance_id, p_path));
+    RIVEGD_POST(rt_watch_vm_property, p_path);
 }
 
 void RiveInstance::watch_property(const String& p_path) {
@@ -194,16 +249,7 @@ Array RiveInstance::take_property_changes() {
     return changes;
 }
 
-#define RIVEGD_POST(METHOD, ...)                                              \
-    do {                                                                       \
-        RiveRenderServer* server = RiveRenderServer::get_singleton();          \
-        if (server == nullptr || instance_id == 0) {                           \
-            return;                                                            \
-        }                                                                      \
-        RenderingServer::get_singleton()->call_on_render_thread(               \
-            callable_mp(server, &RiveRenderServer::METHOD)                     \
-                .bind(instance_id, __VA_ARGS__));                              \
-    } while (0)
+
 
 void RiveInstance::key(int p_rive_key, int p_modifiers, bool p_pressed,
                        bool p_repeat) {
@@ -257,31 +303,17 @@ void RiveInstance::replace_view_model(const String& p_path,
 }
 
 void RiveInstance::fire_property_trigger(const String& p_path) {
-    RiveRenderServer* server = RiveRenderServer::get_singleton();
-    if (server == nullptr || instance_id == 0) {
-        return;
-    }
-    RenderingServer::get_singleton()->call_on_render_thread(
-        callable_mp(server, &RiveRenderServer::rt_fire_vm_trigger)
-            .bind(instance_id, p_path));
+    RIVEGD_POST(rt_fire_vm_trigger, p_path);
 }
 
 void RiveInstance::post_input(const String& p_name, const Variant& p_value) {
-    RiveRenderServer* server = RiveRenderServer::get_singleton();
-    if (server == nullptr || instance_id == 0) {
-        return;
-    }
     switch (p_value.get_type()) {
         case Variant::BOOL:
-            RenderingServer::get_singleton()->call_on_render_thread(
-                callable_mp(server, &RiveRenderServer::rt_set_bool)
-                    .bind(instance_id, p_name, bool(p_value)));
+            RIVEGD_POST(rt_set_bool, p_name, bool(p_value));
             break;
         case Variant::FLOAT:
         case Variant::INT:
-            RenderingServer::get_singleton()->call_on_render_thread(
-                callable_mp(server, &RiveRenderServer::rt_set_number)
-                    .bind(instance_id, p_name, double(p_value)));
+            RIVEGD_POST(rt_set_number, p_name, double(p_value));
             break;
         default:
             break;
@@ -299,24 +331,12 @@ void RiveInstance::set_number_input(const String& p_name, double p_value) {
 }
 
 void RiveInstance::fire_trigger(const String& p_name) {
-    RiveRenderServer* server = RiveRenderServer::get_singleton();
-    if (server == nullptr || instance_id == 0) {
-        return;
-    }
-    RenderingServer::get_singleton()->call_on_render_thread(
-        callable_mp(server, &RiveRenderServer::rt_fire_trigger)
-            .bind(instance_id, p_name));
+    RIVEGD_POST(rt_fire_trigger, p_name);
 }
 
 void RiveInstance::pointer(int p_phase, const Vector2& p_local,
                            const Vector2& p_node_size) {
-    RiveRenderServer* server = RiveRenderServer::get_singleton();
-    if (server == nullptr || instance_id == 0) {
-        return;
-    }
-    RenderingServer::get_singleton()->call_on_render_thread(
-        callable_mp(server, &RiveRenderServer::rt_pointer)
-            .bind(instance_id, p_phase, p_local, p_node_size));
+    RIVEGD_POST(rt_pointer, p_phase, p_local, p_node_size);
 }
 
 void RiveInstance::get_property_list(List<PropertyInfo>* p_list) const {
