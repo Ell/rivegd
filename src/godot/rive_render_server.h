@@ -144,7 +144,8 @@ public:
     // live, no copies. Vulkan only; falls back with an error elsewhere.
     void rt_set_vm_image_live(int64_t p_instance_id,
                               const godot::String& p_path,
-                              const godot::RID& p_rs_texture);
+                              const godot::RID& p_rs_texture,
+                              bool p_dynamic);
     void rt_set_vm_image(int64_t p_instance_id, const godot::String& p_path,
                          const godot::PackedByteArray& p_png_bytes);
     // Artboard property: binds the named artboard from the same file.

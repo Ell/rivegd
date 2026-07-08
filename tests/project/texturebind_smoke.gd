@@ -68,5 +68,14 @@ func _process(_delta: float) -> void:
 		if _shot() != bound_a:
 			fail("static Image binding is unexpectedly animating")
 			return
-		print("TEXTUREBIND OK: live shader texture + static image both bind")
+		# Portrait case: a plain ImageTexture (RD-backed, static) — the
+		# common "dialogue portrait" texture — must adopt and display.
+		var img := Image.create_empty(64, 64, false, Image.FORMAT_RGBA8)
+		img.fill(Color.ORANGE)
+		sprite.call("set_property", "main_im", ImageTexture.create_from_image(img))
+	elif frames == 320:
+		if _shot() == bound_a:
+			fail("ImageTexture portrait bind not visible")
+			return
+		print("TEXTUREBIND OK: live viewport + static image + portrait texture")
 		get_tree().quit(0)

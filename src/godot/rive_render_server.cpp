@@ -1310,7 +1310,8 @@ void RiveRenderServer::rt_gamepads(int64_t p_instance_id,
 
 void RiveRenderServer::rt_set_vm_image_live(int64_t p_instance_id,
                                             const String& p_path,
-                                            const RID& p_rs_texture) {
+                                            const RID& p_rs_texture,
+                                            bool p_dynamic) {
     Instance** found = instances.getptr(p_instance_id);
     if (found == nullptr || (*found)->view_model == nullptr ||
         bridge == nullptr) {
@@ -1367,7 +1368,12 @@ void RiveRenderServer::rt_set_vm_image_live(int64_t p_instance_id,
     }
     property->value(image.get());
     instance->bound_images[p_path] = image;
-    instance->live_image_bound = true;
+    if (p_dynamic) {
+        // Viewport-style textures change every frame outside rive's
+        // knowledge; static textures (imported PNGs, portraits) don't —
+        // let those artboards sleep normally.
+        instance->live_image_bound = true;
+    }
     instance->settled = false;
     instance->needs_render = true;
 }

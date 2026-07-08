@@ -11,6 +11,10 @@
 
 #include <tuple>
 #include <godot_cpp/classes/texture2d.hpp>
+#include <godot_cpp/classes/texture2drd.hpp>
+#include <godot_cpp/classes/viewport_texture.hpp>
+#include <godot_cpp/classes/rd_texture_format.hpp>
+#include <godot_cpp/classes/rendering_device.hpp>
 
 using namespace godot;
 
@@ -236,11 +240,35 @@ void RiveInstance::post_property(const String& p_path, const Variant& p_value) {
             Ref<Texture2D> texture = p_value;
             if (texture.is_valid()) {
                 RenderingServer* rs = RenderingServer::get_singleton();
+                RenderingDevice* rd = rs->get_rendering_device();
                 const RID rd_texture =
                     rs->texture_get_rd_texture(texture->get_rid());
-                if (rd_texture.is_valid()) {
+                bool adoptable = rd != nullptr && rd_texture.is_valid();
+                if (adoptable) {
+                    // Only uncompressed formats adopt directly;
+                    // VRAM-compressed imports fall through to the decode
+                    // path below.
+                    switch (rd->texture_get_format(rd_texture)->get_format()) {
+                        case RenderingDevice::DATA_FORMAT_R8G8B8A8_UNORM:
+                        case RenderingDevice::DATA_FORMAT_R8G8B8A8_SRGB:
+                        case RenderingDevice::DATA_FORMAT_B8G8R8A8_UNORM:
+                        case RenderingDevice::DATA_FORMAT_B8G8R8A8_SRGB:
+                        case RenderingDevice::DATA_FORMAT_R16G16B16A16_SFLOAT:
+                            break;
+                        default:
+                            adoptable = false;
+                    }
+                }
+                if (adoptable) {
+                    // Viewport-backed textures re-render continuously;
+                    // everything else is treated as static (sleeps
+                    // normally — re-set the property if you mutate it).
+                    const bool dynamic =
+                        Object::cast_to<ViewportTexture>(*texture) !=
+                            nullptr ||
+                        Object::cast_to<Texture2DRD>(*texture) != nullptr;
                     RIVEGD_POST(rt_set_vm_image_live, p_path,
-                                texture->get_rid());
+                                texture->get_rid(), dynamic);
                     return;
                 }
             }

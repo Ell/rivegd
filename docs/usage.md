@@ -233,11 +233,22 @@ so its contents update every frame with no copies and no re-binding.
 $Artboard.set_property("main_im", $ShaderViewport.get_texture())
 ```
 
-Plain `Image`s (and CPU-only textures) still work as static one-shot
-binds. Live binding needs the Vulkan renderers; the texture reference is
-kept alive and rebinds automatically if the instance recreates. Note that
-a live-bound artboard re-renders every frame (it can't sleep — the
-texture changes outside Rive's knowledge).
+Ordinary textures work the same way — a dialogue box whose portrait
+follows the speaker is one line per swap, and the bind is a zero-copy GPU
+adopt:
+
+```gdscript
+func on_speaker_changed(speaker: String) -> void:
+    $DialogueBox.set_property("portrait", portraits[speaker])  # Texture2D
+```
+
+Only viewport-style textures (`ViewportTexture`, `Texture2DRD`) keep the
+artboard rendering every frame (their contents change continuously);
+static textures let it sleep normally — re-set the property if you mutate
+one in place. VRAM-compressed imports and CPU-only textures fall back to
+a one-time decode automatically, and plain `Image`s always use it. GPU
+binding needs the Vulkan renderers; bound textures are kept alive and
+rebind if the instance recreates.
 
 ### Fallback fonts
 
