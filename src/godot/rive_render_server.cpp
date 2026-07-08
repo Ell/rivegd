@@ -801,6 +801,14 @@ void RiveRenderServer::rt_render_instance(int64_t p_instance_id,
                                           Instance* instance) {
     bridge->begin_frame(instance->size.x, instance->size.y, 0x00000000);
 
+    static int dbg = 0;
+    if (dbg < 8) {
+        dbg++;
+        fprintf(stderr, "[draw] ab=%.0fx%.0f tex=%dx%d fit=%d ls=%.2f\n",
+                instance->artboard->width(), instance->artboard->height(),
+                instance->size.x, instance->size.y, instance->fit,
+                instance->layout_scale);
+    }
     rive::RiveRenderer renderer(bridge->render_context());
     renderer.save();
     const FitTransform fit = compute_fit(

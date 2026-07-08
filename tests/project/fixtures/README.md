@@ -28,6 +28,19 @@ artboards may not — mark fixtures as components):
   layout. Drives cards_smoke (dynamic lists) and the many-card bench
   (RIVEGD_BENCH_FIXTURE/ARTBOARD/SIZE/COUNT).
 
+cards.riv also carries (all component artboards):
+- `responsive`: 48px header + 25% sidebar + fill content — FIT_LAYOUT
+  reflow assertions (reflow_smoke). Authoring lesson: the MCP layout tool
+  may ignore child width/height/units — verify computed sizes
+  (query_property_values keys 810/811) and set style properties directly.
+- `textbed`: latin + Arabic + CJK text authored with the default latin
+  font — non-latin lines are missing-glyph by construction, rendered as
+  dense tofu boxes. fallbackfont_smoke registers system Noto CJK + Kufi
+  Arabic fallbacks and asserts both rows re-shape (density drops, content
+  remains; also proves RTL shaping and multi-fallback iteration).
+- The `cards` grid has overflow: scroll (clips); interactive drag-scroll
+  needs an editor-authored ScrollConstraint (not MCP-exposed) — pending.
+
 Re-authoring: open in the Rive editor with the MCP server, or rebuild from
 the tool calls recorded in the project history. Signed export is a manual
 editor step (the MCP cannot export).
