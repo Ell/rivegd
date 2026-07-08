@@ -225,15 +225,28 @@ void RiveInstance::post_property(const String& p_path, const Variant& p_value) {
             RIVEGD_POST(rt_set_vm_color, p_path, Color(p_value));
             break;
         case Variant::OBJECT: {
-            // Image properties accept a Godot Image or Texture2D; encode to
-            // PNG here (main thread) and decode through the context factory
-            // on the render thread.
-            Ref<Image> image = p_value;
-            if (image.is_null()) {
-                Ref<Texture2D> texture = p_value;
-                if (texture.is_valid()) {
-                    image = texture->get_image();
+            // Image properties accept:
+            //  - a GPU Texture2D (ViewportTexture, Texture2DRD, a shader-
+            //    driven SubViewport...): bound LIVE — rive samples the
+            //    texture in place, so its contents update every frame with
+            //    zero copies. The texture Ref is kept in property_values,
+            //    so it stays alive and rebinds on instance recreation.
+            //  - an Image (or a CPU-only texture): PNG-encoded here and
+            //    decoded once through the context factory (static).
+            Ref<Texture2D> texture = p_value;
+            if (texture.is_valid()) {
+                RenderingServer* rs = RenderingServer::get_singleton();
+                const RID rd_texture =
+                    rs->texture_get_rd_texture(texture->get_rid());
+                if (rd_texture.is_valid()) {
+                    RIVEGD_POST(rt_set_vm_image_live, p_path,
+                                texture->get_rid());
+                    return;
                 }
+            }
+            Ref<Image> image = p_value;
+            if (image.is_null() && texture.is_valid()) {
+                image = texture->get_image();
             }
             if (image.is_null()) {
                 ERR_PRINT("rivegd: expected an Image or Texture2D for '" +

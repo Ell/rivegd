@@ -1,5 +1,7 @@
 #include "render/vulkan/vulkan_bridge.hpp"
 
+#include "rive/renderer/rive_render_image.hpp"
+#include "rive/renderer/vulkan/render_context_vulkan_impl.hpp"
 #include "rive/renderer/vulkan/render_target_vulkan.hpp"
 
 #include <dlfcn.h>
@@ -161,6 +163,21 @@ VulkanBridge::~VulkanBridge() {
     if (m_vulkan_lib != nullptr) {
         dlclose(m_vulkan_lib);
     }
+}
+
+rive::rcp<rive::RenderImage> VulkanBridge::adopt_texture(uint64_t p_image,
+                                                         uint32_t p_width,
+                                                         uint32_t p_height,
+                                                         uint32_t p_format) {
+    auto* impl = m_context->static_impl_cast<
+        rive::gpu::RenderContextVulkanImpl>();
+    rive::rcp<rive::gpu::Texture> texture = impl->adoptImageTexture(
+        reinterpret_cast<VkImage>(p_image), p_width, p_height,
+        static_cast<VkFormat>(p_format));
+    if (texture == nullptr) {
+        return nullptr;
+    }
+    return rive::make_rcp<rive::RiveRenderImage>(std::move(texture));
 }
 
 rive::rcp<rive::gpu::RenderTarget> VulkanBridge::wrap_render_target(

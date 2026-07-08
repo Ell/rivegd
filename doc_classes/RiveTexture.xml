@@ -40,6 +40,7 @@
 			<param index="1" name="value" type="Variant" />
 			<description>
 				Writes a view-model property. Dispatch is by value type: [bool], [int]/[float], [String] (also enums), [Color], or [Image]/[Texture2D] for image properties. Paths may traverse nested view models: [code]"stats/health"[/code].
+			 Image properties accept a GPU-backed [Texture2D] (for example a [SubViewport] texture), bound live — Rive samples it in place as its contents change — or a static [Image].
 			</description>
 		</method>
 		<method name="get_property" qualifiers="const">

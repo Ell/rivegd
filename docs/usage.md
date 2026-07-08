@@ -221,6 +221,24 @@ bounds tracking the node's fit transform. (Elements publish when assistive techn
 active; the semantic stream itself is inspectable via
 `get_semantics_node_count()`.)
 
+### Live textures in Rive scenes
+
+Image view-model properties accept any GPU-backed `Texture2D` — a
+`SubViewport` rendering a shader, a `ViewportTexture`, another
+`RiveTexture` — and bind it **live**: Rive samples the texture in place,
+so its contents update every frame with no copies and no re-binding.
+
+```gdscript
+# A shader-driven SubViewport, mapped onto a Rive image element:
+$Artboard.set_property("main_im", $ShaderViewport.get_texture())
+```
+
+Plain `Image`s (and CPU-only textures) still work as static one-shot
+binds. Live binding needs the Vulkan renderers; the texture reference is
+kept alive and rebinds automatically if the instance recreates. Note that
+a live-bound artboard re-renders every frame (it can't sleep — the
+texture changes outside Rive's knowledge).
+
 ### Fallback fonts
 
 When a Rive text run needs a glyph its authored font lacks (CJK,

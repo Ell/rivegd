@@ -139,6 +139,12 @@ public:
 
     // Image property: p_png_bytes is an encoded image (PNG/JPEG/WebP),
     // decoded on the render thread through the context factory.
+    // Live GPU binding: wraps the RD texture behind an RS texture RID as
+    // a rive image sampled in place — shader/viewport contents update
+    // live, no copies. Vulkan only; falls back with an error elsewhere.
+    void rt_set_vm_image_live(int64_t p_instance_id,
+                              const godot::String& p_path,
+                              const godot::RID& p_rs_texture);
     void rt_set_vm_image(int64_t p_instance_id, const godot::String& p_path,
                          const godot::PackedByteArray& p_png_bytes);
     // Artboard property: binds the named artboard from the same file.

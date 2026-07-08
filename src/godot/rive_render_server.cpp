@@ -94,6 +94,9 @@ struct RiveRenderServer::Instance {
     bool needs_render = true;
     bool settled = false;
     bool semantics_enabled = false;
+    // A live-bound GPU image updates outside rive's knowledge: the
+    // instance must re-render every frame to re-sample it (never settles).
+    bool live_image_bound = false;
     // Reports already delivered from the current report generation (rive
     // clears reports on advance; between advances they accumulate).
     size_t events_delivered = 0;
@@ -756,6 +759,10 @@ void RiveRenderServer::rt_frame(int64_t p_instance_id, double p_delta) {
         if (advancing) {
             instance->settled = false;
             instance->needs_render = true;
+        } else if (instance->live_image_bound) {
+            // Live-bound image: its contents change externally every
+            // frame — keep rendering so rive re-samples it.
+            instance->needs_render = true;
         } else if (!instance->settled) {
             // Render one final frame in the settled pose, then sleep.
             instance->settled = true;
@@ -1299,6 +1306,70 @@ void RiveRenderServer::rt_gamepads(int64_t p_instance_id,
                                                            p_batch.size())) {
         ERR_PRINT("rivegd: malformed gamepad batch rejected");
     }
+}
+
+void RiveRenderServer::rt_set_vm_image_live(int64_t p_instance_id,
+                                            const String& p_path,
+                                            const RID& p_rs_texture) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || (*found)->view_model == nullptr ||
+        bridge == nullptr) {
+        return;
+    }
+    Instance* instance = *found;
+    auto* property =
+        instance->view_model->propertyImage(p_path.utf8().get_data());
+    if (property == nullptr) {
+        ERR_PRINT("rivegd: image property not found: " + p_path);
+        return;
+    }
+    RenderingServer* rs = RenderingServer::get_singleton();
+    RenderingDevice* rd = rs->get_rendering_device();
+    const RID rd_texture =
+        rd != nullptr ? rs->texture_get_rd_texture(p_rs_texture) : RID();
+    if (!rd_texture.is_valid()) {
+        ERR_PRINT("rivegd: live image binding needs an RD-backed texture "
+                  "(Vulkan renderers); use an Image for '" + p_path + "'");
+        return;
+    }
+    Ref<RDTextureFormat> format = rd->texture_get_format(rd_texture);
+    // Godot DataFormat -> VkFormat (values are Vulkan-ABI stable).
+    uint32_t vk_format = 0;
+    switch (format->get_format()) {
+        case RenderingDevice::DATA_FORMAT_R8G8B8A8_UNORM:
+            vk_format = 37; // VK_FORMAT_R8G8B8A8_UNORM
+            break;
+        case RenderingDevice::DATA_FORMAT_R8G8B8A8_SRGB:
+            vk_format = 43; // VK_FORMAT_R8G8B8A8_SRGB
+            break;
+        case RenderingDevice::DATA_FORMAT_B8G8R8A8_UNORM:
+            vk_format = 44; // VK_FORMAT_B8G8R8A8_UNORM
+            break;
+        case RenderingDevice::DATA_FORMAT_B8G8R8A8_SRGB:
+            vk_format = 50; // VK_FORMAT_B8G8R8A8_SRGB
+            break;
+        case RenderingDevice::DATA_FORMAT_R16G16B16A16_SFLOAT:
+            vk_format = 97; // VK_FORMAT_R16G16B16A16_SFLOAT
+            break;
+        default:
+            ERR_PRINT(vformat(
+                "rivegd: unsupported texture format %d for live image '%s'",
+                int(format->get_format()), p_path));
+            return;
+    }
+    const uint64_t vk_image = rd->get_driver_resource(
+        RenderingDevice::DRIVER_RESOURCE_VULKAN_IMAGE, rd_texture, 0);
+    rive::rcp<rive::RenderImage> image = bridge->adopt_texture(
+        vk_image, format->get_width(), format->get_height(), vk_format);
+    if (image == nullptr) {
+        ERR_PRINT("rivegd: adopt_texture failed for '" + p_path + "'");
+        return;
+    }
+    property->value(image.get());
+    instance->bound_images[p_path] = image;
+    instance->live_image_bound = true;
+    instance->settled = false;
+    instance->needs_render = true;
 }
 
 void RiveRenderServer::rt_set_vm_image(int64_t p_instance_id,

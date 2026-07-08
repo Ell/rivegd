@@ -21,6 +21,17 @@ public:
     // The context doubles as the rive::Factory that must import files whose
     // GPU resources it owns.
     virtual rive::gpu::RenderContext* render_context() const = 0;
+
+    // Wraps an externally-owned native texture (VkImage on the Vulkan
+    // bridge) as a rive RenderImage sampled IN PLACE — contents update
+    // live with zero copies. p_native_format is the backend's native
+    // format enum (VkFormat). Returns null when unsupported.
+    virtual rive::rcp<rive::RenderImage> adopt_texture(uint64_t /*image*/,
+                                                       uint32_t /*width*/,
+                                                       uint32_t /*height*/,
+                                                       uint32_t /*format*/) {
+        return nullptr;
+    }
     rive::Factory* factory() const { return render_context(); }
 
     // Wraps a texture created by the host as a Rive render target. The two

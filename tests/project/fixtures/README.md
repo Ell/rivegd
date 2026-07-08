@@ -1,7 +1,9 @@
 # Test fixtures
 
 Most `.riv` files here are copied from the `rive-runtime` submodule's MIT test
-assets (used for metadata/behavior coverage). One is ours:
+assets (used for metadata/behavior coverage) — including
+`data_binding_images_test.riv` (artboard `main`, image property `main_im`
+displayed by the `root_img` element; drives texturebind_smoke). Two are ours:
 
 ## rivegd_fixtures.riv — authored for rivegd via the Rive editor MCP
 
