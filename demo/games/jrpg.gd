@@ -68,6 +68,7 @@ func _block(cell: Vector2, w := 1, h := 1) -> void:
 
 
 func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	world = Node2D.new()
 	world.z_index = -20 # sprites use z_index 0..10; keep ALL below the UI
 	add_child(world)

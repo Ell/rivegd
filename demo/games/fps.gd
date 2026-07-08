@@ -23,6 +23,7 @@ var info: Label
 
 
 func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# The room renders in the ROOT viewport (3D nodes join its World3D);
 	# the Control UI draws over it. No 3D-in-SubViewport — that path
 	# darkens on the Compatibility/WebGL renderer (color-space mismatch).

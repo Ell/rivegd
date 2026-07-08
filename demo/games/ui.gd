@@ -22,6 +22,7 @@ static func label(text: String, size: int, pos: Vector2, color := Color.WHITE,
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	l.add_theme_constant_override("shadow_offset_y", 2)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 
 
@@ -36,6 +37,7 @@ static func panel(pos: Vector2, panel_size: Vector2, border := Color("4a5169"),
 	style.shadow_color = Color(0, 0, 0, 0.45)
 	style.shadow_size = 10
 	p.add_theme_stylebox_override("panel", style)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.position = pos
 	p.custom_minimum_size = panel_size
 	p.size = panel_size

@@ -13,6 +13,7 @@ var current: Node
 
 
 func _ready() -> void:
+	add_to_group("game_manager")
 	switch_to("menu")
 
 

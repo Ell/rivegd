@@ -10,9 +10,11 @@ const TILES := [
 
 
 func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var bg := ColorRect.new()
 	bg.color = GameUI.BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 	GameUI.vignette(self)
 
@@ -54,5 +56,5 @@ func _style(card: RiveControl, i: int) -> void:
 func _clicked(event: InputEvent, i: int) -> void:
 	if event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
-		await get_tree().create_timer(0.12).timeout
-		get_node("/root/Games").switch_to(TILES[i][1])
+		get_tree().get_first_node_in_group("game_manager").call_deferred(
+				"switch_to", TILES[i][1])

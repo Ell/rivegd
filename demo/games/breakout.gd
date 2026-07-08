@@ -22,9 +22,11 @@ var trail: CPUParticles2D
 
 
 func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var bg := ColorRect.new()
 	bg.color = GameUI.BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 	GameUI.vignette(self)
 
@@ -104,7 +106,7 @@ func _reset_ball() -> void:
 	msg.visible = true
 
 
-func _gui_input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and not playing \
 			and lives > 0 and not bricks.is_empty():
 		playing = true
