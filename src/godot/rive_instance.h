@@ -42,6 +42,12 @@ public:
 
     void frame(double p_delta);
 
+    // Live resize (fit = Layout): reflow the artboard immediately (cheap,
+    // preserves all state); swap the texture separately once the size has
+    // settled — the instance, state machine, and view model survive.
+    void resize_artboard(const godot::Vector2& p_logical_size);
+    void resize_texture(const godot::Vector2i& p_size);
+
     // Polls the RID mailboxes; returns true the moment the texture binds.
     bool update_texture_binding();
     // RS-level texture (canvas drawing; valid on every backend).

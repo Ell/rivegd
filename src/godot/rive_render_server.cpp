@@ -146,6 +146,44 @@ RiveRenderServer::RiveRenderServer() {
 }
 
 RiveRenderServer::~RiveRenderServer() {
+    // Quit-time sweep: instances released during teardown post rt_free to
+    // the render thread, but a quitting app never services it — free the
+    // GPU textures here (extension deinit, single-threaded, servers still
+    // alive). Rive objects go down with the CommandServer below.
+    if (RenderingServer::get_singleton() != nullptr) {
+        RenderingServer* rs = RenderingServer::get_singleton();
+        RenderingDevice* rd = rs->get_rendering_device();
+        if (bridge != nullptr) {
+            bridge->wait_idle();
+        }
+        for (const KeyValue<int64_t, Instance*>& entry : instances) {
+            Instance* instance = entry.value;
+            if (instance->rs_texture.is_valid()) {
+                rs->free_rid(instance->rs_texture);
+            }
+            if (instance->rd_texture.is_valid() && rd != nullptr) {
+                rd->free_rid(instance->rd_texture);
+            }
+            memdelete(instance);
+        }
+        instances.clear();
+    }
+    // Free any textures still parked in the resize graveyard (a quit right
+    // after a resize would otherwise leak them past the last flush).
+    if (!retired_rids.is_empty() &&
+        RenderingServer::get_singleton() != nullptr) {
+        RenderingServer* rs = RenderingServer::get_singleton();
+        RenderingDevice* rd = rs->get_rendering_device();
+        for (const RetiredRids& retired : retired_rids) {
+            if (retired.rs_texture.is_valid()) {
+                rs->free_rid(retired.rs_texture);
+            }
+            if (retired.rd_texture.is_valid() && rd != nullptr) {
+                rd->free_rid(retired.rd_texture);
+            }
+        }
+        retired_rids.clear();
+    }
     // The server must die before the queue reference drops.
     command_server.reset();
     delete command_queue_storage;
@@ -183,6 +221,14 @@ void RiveRenderServer::on_frame_pre_draw() {
     // instances = ~200 single-render submissions/frame, bimodal fence
     // stalls, 134ms spikes.)
     if (pump_pending.load()) {
+        RenderingServer::get_singleton()->call_on_render_thread(
+            callable_mp(this, &RiveRenderServer::rt_flush_all));
+    }
+}
+
+void RiveRenderServer::request_pump_now() {
+    bool expected = false;
+    if (pump_pending.compare_exchange_strong(expected, true)) {
         RenderingServer::get_singleton()->call_on_render_thread(
             callable_mp(this, &RiveRenderServer::rt_flush_all));
     }
@@ -326,9 +372,13 @@ static FitTransform compute_fit(int fit, float align_x, float align_y,
                 MIN(1.0f, MIN(tex_w / ab_w, tex_h / ab_h));
             break;
         case RiveRenderServer::FIT_LAYOUT:
-            // Artboard is sized texture/layout_scale upstream; draw scaled
-            // back up so content renders at layout_scale x.
-            out.sx = out.sy = MAX(0.01f, layout_scale);
+            // Artboard tracks node_size/layout_scale upstream; computing
+            // the transform from the ACTUAL sizes (rather than assuming
+            // they match) keeps content mapped correctly during live
+            // resizes, when the artboard has reflowed but the texture has
+            // not been recreated yet.
+            out.sx = tex_w / ab_w;
+            out.sy = tex_h / ab_h;
             return out;
         case RiveRenderServer::FIT_CONTAIN:
         default:
@@ -473,56 +523,9 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
     }
 
     // Create the shared texture and hand its native handle(s) to Rive.
-    // RD path: RD texture (VkImage/view), surfaced to the scene through an
-    // RS wrapper (texture_rd_create). GL path: an RS texture whose GL id we
-    // render into directly.
-    RenderingServer* rs = RenderingServer::get_singleton();
-    RenderingDevice* rd = has_bridge ? rs->get_rendering_device() : nullptr;
-    uint64_t native_a = 0;
-    uint64_t native_b = 0;
-    if (!has_bridge) {
-        // Logic-only: no texture, no render target.
-    } else if (rd != nullptr) {
-        Ref<RDTextureFormat> format;
-        format.instantiate();
-        format->set_format(RenderingDevice::DATA_FORMAT_R8G8B8A8_UNORM);
-        format->set_width(instance->size.x);
-        format->set_height(instance->size.y);
-        format->set_usage_bits(
-            RenderingDevice::TEXTURE_USAGE_SAMPLING_BIT |
-            RenderingDevice::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT |
-            RenderingDevice::TEXTURE_USAGE_STORAGE_BIT |
-            RenderingDevice::TEXTURE_USAGE_CAN_COPY_FROM_BIT |
-            RenderingDevice::TEXTURE_USAGE_CAN_COPY_TO_BIT);
-        Ref<RDTextureView> view;
-        view.instantiate();
-        instance->rd_texture = rd->texture_create(format, view);
-        if (!instance->rd_texture.is_valid()) {
-            ERR_PRINT("rivegd: RD texture_create failed");
-            memdelete(instance);
-            return;
-        }
-        instance->rs_texture = rs->texture_rd_create(instance->rd_texture);
-        native_a = rd->get_driver_resource(
-            RenderingDevice::DRIVER_RESOURCE_VULKAN_IMAGE,
-            instance->rd_texture, 0);
-        native_b = rd->get_driver_resource(
-            RenderingDevice::DRIVER_RESOURCE_VULKAN_IMAGE_VIEW,
-            instance->rd_texture, 0);
-    } else {
-        Ref<Image> placeholder = Image::create_empty(
-            instance->size.x, instance->size.y, false, Image::FORMAT_RGBA8);
-        instance->rs_texture = rs->texture_2d_create(placeholder);
-        if (!instance->rs_texture.is_valid()) {
-            ERR_PRINT("rivegd: RS texture_2d_create failed");
-            memdelete(instance);
-            return;
-        }
-        native_a = rs->texture_get_native_handle(instance->rs_texture);
-    }
-    if (has_bridge) {
-        instance->target = bridge->wrap_render_target(
-            instance->size.x, instance->size.y, native_a, native_b);
+    if (!rt_create_target(p_instance_id, instance, has_bridge)) {
+        memdelete(instance);
+        return;
     }
 
     // Route this artboard's audio: a dedicated engine when requested
@@ -552,6 +555,123 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
         texture_mailbox[p_instance_id] = instance->rd_texture;
         canvas_texture_mailbox[p_instance_id] = instance->rs_texture;
     }
+}
+
+// Allocates the instance's GPU texture + render target at instance->size
+// and posts the fresh RIDs to the texture mailboxes. Reused by resize
+// (rt_resize_texture) — RD path: RD texture (VkImage/view) surfaced via an
+// RS wrapper (texture_rd_create); GL path: an RS texture rendered into
+// directly. Logic-only instances get no texture.
+bool RiveRenderServer::rt_create_target(int64_t p_instance_id,
+                                        Instance* instance, bool has_bridge) {
+    RenderingServer* rs = RenderingServer::get_singleton();
+    RenderingDevice* rd = has_bridge ? rs->get_rendering_device() : nullptr;
+    uint64_t native_a = 0;
+    uint64_t native_b = 0;
+    if (!has_bridge) {
+        // Logic-only: no texture, no render target.
+    } else if (rd != nullptr) {
+        Ref<RDTextureFormat> format;
+        format.instantiate();
+        format->set_format(RenderingDevice::DATA_FORMAT_R8G8B8A8_UNORM);
+        format->set_width(instance->size.x);
+        format->set_height(instance->size.y);
+        format->set_usage_bits(
+            RenderingDevice::TEXTURE_USAGE_SAMPLING_BIT |
+            RenderingDevice::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT |
+            RenderingDevice::TEXTURE_USAGE_STORAGE_BIT |
+            RenderingDevice::TEXTURE_USAGE_CAN_COPY_FROM_BIT |
+            RenderingDevice::TEXTURE_USAGE_CAN_COPY_TO_BIT);
+        Ref<RDTextureView> view;
+        view.instantiate();
+        instance->rd_texture = rd->texture_create(format, view);
+        if (!instance->rd_texture.is_valid()) {
+            ERR_PRINT("rivegd: RD texture_create failed");
+            return false;
+        }
+        instance->rs_texture = rs->texture_rd_create(instance->rd_texture);
+        native_a = rd->get_driver_resource(
+            RenderingDevice::DRIVER_RESOURCE_VULKAN_IMAGE,
+            instance->rd_texture, 0);
+        native_b = rd->get_driver_resource(
+            RenderingDevice::DRIVER_RESOURCE_VULKAN_IMAGE_VIEW,
+            instance->rd_texture, 0);
+    } else {
+        Ref<Image> placeholder = Image::create_empty(
+            instance->size.x, instance->size.y, false, Image::FORMAT_RGBA8);
+        instance->rs_texture = rs->texture_2d_create(placeholder);
+        if (!instance->rs_texture.is_valid()) {
+            ERR_PRINT("rivegd: RS texture_2d_create failed");
+            return false;
+        }
+        native_a = rs->texture_get_native_handle(instance->rs_texture);
+    }
+    if (has_bridge) {
+        instance->target = bridge->wrap_render_target(
+            instance->size.x, instance->size.y, native_a, native_b);
+    }
+    {
+        std::lock_guard<std::mutex> lock(mailbox_mutex);
+        texture_mailbox[p_instance_id] = instance->rd_texture;
+        canvas_texture_mailbox[p_instance_id] = instance->rs_texture;
+    }
+    return true;
+}
+
+// Live artboard reflow during a resize (FIT_LAYOUT): cheap, preserves all
+// state; the texture is recreated separately once the size settles.
+void RiveRenderServer::rt_resize_artboard(int64_t p_instance_id,
+                                          const Vector2& p_logical_size) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || !(*found)->valid) {
+        return;
+    }
+    Instance* instance = *found;
+    if (instance->fit != FIT_LAYOUT || instance->artboard == nullptr) {
+        return;
+    }
+    instance->artboard->width(
+        MAX(1.0f, p_logical_size.x / instance->layout_scale));
+    instance->artboard->height(
+        MAX(1.0f, p_logical_size.y / instance->layout_scale));
+    instance->settled = false;
+    instance->needs_render = true;
+}
+
+// Texture-only resize: swaps the GPU target without touching the file,
+// artboard, state machine, or view model — SM state survives (unlike the
+// historical full instance recreation). Old RIDs are retired at the START
+// of a later flush so in-flight scene draws never sample a freed texture.
+void RiveRenderServer::rt_resize_texture(int64_t p_instance_id,
+                                         const Vector2i& p_size) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || !(*found)->valid) {
+        return;
+    }
+    Instance* instance = *found;
+    const Vector2i size = Vector2i(MAX(1, p_size.x), MAX(1, p_size.y));
+    if (size == instance->size && instance->target != nullptr) {
+        return;
+    }
+    instance->size = size;
+    if (bridge == nullptr) {
+        return; // logic-only: size is bookkeeping only
+    }
+    // Retire (do not free yet) the old resources.
+    retired_rids.push_back({instance->rd_texture, instance->rs_texture});
+    instance->rd_texture = RID();
+    instance->rs_texture = RID();
+    instance->target = nullptr;
+    if (!rt_create_target(p_instance_id, instance, true)) {
+        instance->valid = false;
+        return;
+    }
+    if (instance->fit == FIT_LAYOUT && instance->artboard != nullptr) {
+        instance->artboard->width(float(size.x) / instance->layout_scale);
+        instance->artboard->height(float(size.y) / instance->layout_scale);
+    }
+    instance->settled = false;
+    instance->needs_render = true;
 }
 
 void RiveRenderServer::rt_drain_reported_events(int64_t p_instance_id,
@@ -715,6 +835,22 @@ void RiveRenderServer::rt_flush_all() {
         command_server = std::make_unique<rive::CommandServer>(
             *command_queue_storage, factory);
     }
+    // Free textures retired by rt_resize_texture at least one flush ago —
+    // the scene has re-drawn with the replacement RIDs by now.
+    if (!retired_rids.is_empty()) {
+        RenderingServer* rs = RenderingServer::get_singleton();
+        RenderingDevice* rd = rs->get_rendering_device();
+        for (const RetiredRids& retired : retired_rids) {
+            if (retired.rs_texture.is_valid()) {
+                rs->free_rid(retired.rs_texture);
+            }
+            if (retired.rd_texture.is_valid() && rd != nullptr) {
+                rd->free_rid(retired.rd_texture);
+            }
+        }
+        retired_rids.clear();
+    }
+
     command_server->processCommands();
 
     if (bridge == nullptr || instances.is_empty()) {

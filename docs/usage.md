@@ -303,6 +303,12 @@ anchor (9-grid) for modes that don't fill exactly. Pointer input and
 listener-aware hit testing invert the same transform, so clicks stay
 accurate in every mode.
 
+Resizing a `RiveControl` is cheap and stateful: with `fit = Layout` the
+artboard reflows **live** while the size changes, and once the size
+settles (0.3 s) only the GPU texture is swapped — the state machine, view
+model, and playback position all survive (verified: a toggled switch stays
+toggled through a resize).
+
 With `fit = Layout`, `layout_scale` sets the content scale (Unity's
 "Layout Scale Factor"): the artboard is laid out at `size / layout_scale`
 and drawn scaled up. DPI recipes: constant pixel size = leave at 1.0;

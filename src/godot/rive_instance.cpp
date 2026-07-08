@@ -150,6 +150,18 @@ void RiveInstance::release() {
     rd_texture = RID();
 }
 
+void RiveInstance::resize_artboard(const Vector2& p_logical_size) {
+    RIVEGD_POST(rt_resize_artboard, p_logical_size);
+}
+
+void RiveInstance::resize_texture(const Vector2i& p_size) {
+    RIVEGD_POST(rt_resize_texture, p_size);
+    // Fresh RIDs land in the mailboxes; rebind on the next poll.
+    texture_bound = false;
+    canvas_texture = RID();
+    rd_texture = RID();
+}
+
 void RiveInstance::frame(double p_delta) {
     if (instance_id == 0) {
         return;

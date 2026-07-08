@@ -636,6 +636,11 @@ void RiveControl::_notification(int p_what) {
         } break;
         case NOTIFICATION_RESIZED: {
             resize_cooldown = kResizeDebounceSeconds;
+            // Layout fit reflows LIVE while the size changes (cheap; all
+            // state preserved); the texture swap waits for the debounce.
+            if (rive.is_live() && rive.fit == RiveRenderServer::FIT_LAYOUT) {
+                rive.resize_artboard(get_size());
+            }
         } break;
         case NOTIFICATION_MOUSE_EXIT: {
             if (rive.is_live()) {
@@ -648,7 +653,10 @@ void RiveControl::_notification(int p_what) {
                 resize_cooldown -= get_process_delta_time();
                 if (resize_cooldown <= 0.0 &&
                     texture_size() != live_texture_size) {
-                    recreate_instance();
+                    // Texture-only swap: the instance (and its state
+                    // machine state) survives the resize.
+                    live_texture_size = texture_size();
+                    rive.resize_texture(live_texture_size);
                     break;
                 }
             }

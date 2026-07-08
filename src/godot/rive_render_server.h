@@ -53,6 +53,9 @@ public:
     // it, but that signal never fires headless — writers call this after
     // queueing (deduped by an atomic flag cleared in rt_flush_all).
     void request_pump();
+    // Immediate pump, bypassing the frame_pre_draw deferral — for teardown
+    // paths that must run even when no further frame will be drawn (quit).
+    void request_pump_now();
 
     // Main thread: RID mailboxes (filled by rt_init_instance).
     godot::RID get_texture_rid(int64_t p_instance_id);        // RD texture
@@ -176,6 +179,13 @@ public:
     void rt_set_semantics_enabled(int64_t p_instance_id, bool p_enabled);
     godot::Array take_semantics(int64_t p_instance_id);
 
+    // Live resize (fit = Layout): reflow now, swap the texture at the
+    // debounce — the instance and its state survive.
+    void rt_resize_artboard(int64_t p_instance_id,
+                            const godot::Vector2& p_logical_size);
+    void rt_resize_texture(int64_t p_instance_id,
+                           const godot::Vector2i& p_size);
+
     // Reads a list item's scalar and posts it to the property mailbox under
     // the synthetic path "<path>[<index>]/<sub_path>" (surfaced through
     // property_changed / get_property like any watched value).
@@ -212,6 +222,8 @@ private:
     void rt_render_instance(int64_t p_instance_id, Instance* p_instance);
     void rt_drain_reported_events(int64_t p_instance_id, Instance* p_instance);
     void rt_drain_semantics(int64_t p_instance_id, Instance* p_instance);
+    bool rt_create_target(int64_t p_instance_id, Instance* p_instance,
+                          bool p_has_bridge);
 
     bool rt_ensure_bridge();
 
@@ -237,6 +249,13 @@ private:
     // (hit_test). Coarse by design — reads are rare (opt-in hit testing).
     std::mutex flush_mutex;
     godot::HashMap<int64_t, godot::Array> semantics_mailbox;
+    // Textures swapped out by rt_resize_texture, freed one flush later so
+    // in-flight scene draws never sample a freed RID (render thread only).
+    struct RetiredRids {
+        godot::RID rd_texture;
+        godot::RID rs_texture;
+    };
+    godot::LocalVector<RetiredRids> retired_rids;
     godot::HashMap<int64_t, godot::RID> texture_mailbox;
     godot::HashMap<int64_t, godot::RID> canvas_texture_mailbox;
     godot::HashMap<int64_t, godot::Array> event_mailbox;
