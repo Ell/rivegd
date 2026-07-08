@@ -4,9 +4,16 @@ config_version=5
 [application]
 
 config/name="rivegd demo"
-run/main_scene="res://main.tscn"
+run/main_scene="res://games/main.tscn"
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
 
 [display]
 
 window/size/viewport_width=1100
 window/size/viewport_height=680
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+

@@ -1,0 +1,4 @@
+[gd_scene load_steps=2 format=3 uid="uid://rivegd_games_probe"]
+[ext_resource type="Script" path="res://games/probe.gd" id="1"]
+[node name="P" type="Node"]
+script = ExtResource("1")
