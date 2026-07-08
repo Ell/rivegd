@@ -107,7 +107,8 @@ public:
     // mapped through the same contain-fit transform used for drawing.
     void rt_pointer(int64_t p_instance_id, int p_phase,
                     const godot::Vector2& p_local,
-                    const godot::Vector2& p_node_size, int p_pointer_id);
+                    const godot::Vector2& p_node_size, int p_pointer_id,
+                    float p_timestamp);
 
     // Data binding (view model) writes; p_path is Rive's slash-delimited
     // property path (e.g. "stats/health").

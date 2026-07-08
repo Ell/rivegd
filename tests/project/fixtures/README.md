@@ -38,8 +38,13 @@ cards.riv also carries (all component artboards):
   dense tofu boxes. fallbackfont_smoke registers system Noto CJK + Kufi
   Arabic fallbacks and asserts both rows re-shape (density drops, content
   remains; also proves RTL shaping and multi-fallback iteration).
-- The `cards` grid has overflow: scroll (clips); interactive drag-scroll
-  needs an editor-authored ScrollConstraint (not MCP-exposed) — pending.
+- The `cards` grid has a vertical ScrollConstraint (editor-authored;
+  clamped physics). Runtime findings: rive scroll responds to plain
+  pointer events but its physics integrates MOVE-event timestamps (we now
+  pass real time); the card's Click listener with "Opaque Target" enabled
+  consumes drags before the scroll viewport sees them (HitResult
+  hitOpaque) — non-opaque listener targets let click AND scroll coexist.
+  scroll smoke pending that authoring tweak.
 - `card` carries a declarative Click listener (targets card-bg, sets
   CardVM.tint to red) — clicklistener_smoke drives it through Godot input
   and asserts the VM write via watch AND pixels. Authoring note: this

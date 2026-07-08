@@ -5,6 +5,7 @@
 #include "rive/command_queue.hpp"
 
 #include <godot_cpp/classes/file_access.hpp>
+#include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 
@@ -398,7 +399,10 @@ void RiveInstance::fire_trigger(const String& p_name) {
 
 void RiveInstance::pointer(int p_phase, const Vector2& p_local,
                            const Vector2& p_node_size, int p_pointer_id) {
-    RIVEGD_POST(rt_pointer, p_phase, p_local, p_node_size, p_pointer_id);
+    const float timestamp =
+        float(double(godot::Time::get_singleton()->get_ticks_usec()) / 1e6);
+    RIVEGD_POST(rt_pointer, p_phase, p_local, p_node_size, p_pointer_id,
+                timestamp);
 }
 
 void RiveInstance::get_property_list(List<PropertyInfo>* p_list) const {
