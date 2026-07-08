@@ -1311,7 +1311,29 @@ void RiveRenderServer::rt_gamepads(int64_t p_instance_id,
 void RiveRenderServer::rt_set_vm_image_live(int64_t p_instance_id,
                                             const String& p_path,
                                             const RID& p_rs_texture,
-                                            bool p_dynamic) {
+                                            bool p_dynamic, int p_retries) {
+    // Viewport render targets allocate lazily — a bind issued the frame a
+    // SubViewport was created can beat its GPU resource. Retry next pump.
+    auto retry = [&]() -> bool {
+        if (!p_dynamic || p_retries <= 0) {
+            return false;
+        }
+        RiveRenderServer* server = this;
+        const int64_t id = p_instance_id;
+        const String path = p_path;
+        const RID rid = p_rs_texture;
+        const bool dynamic = p_dynamic;
+        const int retries = p_retries - 1;
+        queue()->runOnce(
+            [server, id, path, rid, dynamic, retries](rive::CommandServer*) {
+                server->rt_set_vm_image_live(id, path, rid, dynamic, retries);
+            });
+        Instance** found = instances.getptr(p_instance_id);
+        if (found != nullptr) {
+            (*found)->needs_render = true; // keep the frame loop pumping
+        }
+        return true;
+    };
     Instance** found = instances.getptr(p_instance_id);
     if (found == nullptr || (*found)->view_model == nullptr ||
         bridge == nullptr) {
@@ -1326,11 +1348,47 @@ void RiveRenderServer::rt_set_vm_image_live(int64_t p_instance_id,
     }
     RenderingServer* rs = RenderingServer::get_singleton();
     RenderingDevice* rd = rs->get_rendering_device();
-    const RID rd_texture =
-        rd != nullptr ? rs->texture_get_rd_texture(p_rs_texture) : RID();
+    if (rd == nullptr) {
+        // GL / web path: adopt by native GL texture id. Width/height come
+        // from the RS texture; format is implicit in GL.
+        const uint64_t gl_id = rs->texture_get_native_handle(p_rs_texture);
+        if (gl_id == 0) {
+            if (retry()) {
+                return;
+            }
+            ERR_PRINT("rivegd: no native texture handle for live image '" +
+                      p_path + "' — on the GL/web renderer, pass the "
+                      "SubViewport itself instead of its ViewportTexture");
+            return;
+        }
+        Ref<Image> probe = rs->texture_2d_get(p_rs_texture);
+        if (probe.is_null()) {
+            ERR_PRINT("rivegd: cannot size live image '" + p_path + "'");
+            return;
+        }
+        rive::rcp<rive::RenderImage> gl_image = bridge->adopt_texture(
+            gl_id, uint32_t(probe->get_width()),
+            uint32_t(probe->get_height()), 0);
+        if (gl_image == nullptr) {
+            ERR_PRINT("rivegd: adopt_texture failed for '" + p_path + "'");
+            return;
+        }
+        property->value(gl_image.get());
+        instance->bound_images[p_path] = gl_image;
+        if (p_dynamic) {
+            instance->live_image_bound = true;
+        }
+        instance->settled = false;
+        instance->needs_render = true;
+        return;
+    }
+    const RID rd_texture = rs->texture_get_rd_texture(p_rs_texture);
     if (!rd_texture.is_valid()) {
-        ERR_PRINT("rivegd: live image binding needs an RD-backed texture "
-                  "(Vulkan renderers); use an Image for '" + p_path + "'");
+        if (retry()) {
+            return;
+        }
+        ERR_PRINT("rivegd: live image binding needs a GPU-backed texture; "
+                  "use an Image for '" + p_path + "'");
         return;
     }
     Ref<RDTextureFormat> format = rd->texture_get_format(rd_texture);

@@ -230,8 +230,12 @@ so its contents update every frame with no copies and no re-binding.
 
 ```gdscript
 # A shader-driven SubViewport, mapped onto a Rive image element:
-$Artboard.set_property("main_im", $ShaderViewport.get_texture())
+$Artboard.set_property("main_im", $ShaderViewport)   # pass the viewport itself
 ```
+
+Passing the `SubViewport` node is the most robust form and works on every
+renderer, including web; a `ViewportTexture` also works on the Vulkan
+renderers.
 
 Ordinary textures work the same way — a dialogue box whose portrait
 follows the speaker is one line per swap, and the bind is a zero-copy GPU
@@ -247,8 +251,8 @@ artboard rendering every frame (their contents change continuously);
 static textures let it sleep normally — re-set the property if you mutate
 one in place. VRAM-compressed imports and CPU-only textures fall back to
 a one-time decode automatically, and plain `Image`s always use it. GPU
-binding needs the Vulkan renderers; bound textures are kept alive and
-rebind if the instance recreates.
+binding works on the Vulkan renderers and on web (WebGL2); bound textures
+are kept alive and rebind if the instance recreates.
 
 ### Fallback fonts
 

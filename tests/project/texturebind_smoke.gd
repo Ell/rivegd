@@ -48,7 +48,7 @@ func _process(_delta: float) -> void:
 	frames += 1
 	if frames == 40:
 		baseline = _shot()
-		sprite.call("set_property", "main_im", vp.get_texture())
+		sprite.call("set_property", "main_im", vp)  # Viewport object: robust on all renderers
 	elif frames == 100:
 		bound_a = _shot()
 		if bound_a == baseline:

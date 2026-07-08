@@ -1,6 +1,7 @@
 #include "render/gl/gl_bridge.hpp"
 
 #include "rive/renderer/gl/render_context_gl_impl.hpp"
+#include "rive/renderer/rive_render_image.hpp"
 #include "rive/renderer/gl/render_target_gl.hpp"
 #include "rive/renderer/texture.hpp"
 
@@ -77,6 +78,20 @@ std::unique_ptr<GLBridge> GLBridge::create(std::string* out_error) {
         return fail("RenderContextGLImpl::MakeContext failed");
     }
     return bridge;
+}
+
+rive::rcp<rive::RenderImage> GLBridge::adopt_texture(uint64_t p_image,
+                                                     uint32_t p_width,
+                                                     uint32_t p_height,
+                                                     uint32_t /*p_format*/) {
+    auto* impl =
+        m_context->static_impl_cast<rive::gpu::RenderContextGLImpl>();
+    rive::rcp<rive::gpu::Texture> texture = impl->adoptImageTexture(
+        p_width, p_height, static_cast<unsigned int>(p_image));
+    if (texture == nullptr) {
+        return nullptr;
+    }
+    return rive::make_rcp<rive::RiveRenderImage>(std::move(texture));
 }
 
 GLBridge::~GLBridge() {

@@ -12,6 +12,7 @@
 #include <tuple>
 #include <godot_cpp/classes/texture2d.hpp>
 #include <godot_cpp/classes/texture2drd.hpp>
+#include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/classes/viewport_texture.hpp>
 #include <godot_cpp/classes/rd_texture_format.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
@@ -237,14 +238,42 @@ void RiveInstance::post_property(const String& p_path, const Variant& p_value) {
             //    so it stays alive and rebinds on instance recreation.
             //  - an Image (or a CPU-only texture): PNG-encoded here and
             //    decoded once through the context factory (static).
+            // A Viewport/SubViewport binds its render target directly —
+            // the most robust live form on every renderer (ViewportTexture
+            // proxies expose no native handle on GL/web).
+            if (godot::Viewport* viewport =
+                    Object::cast_to<godot::Viewport>(p_value)) {
+                const RID rt_texture =
+                    RenderingServer::get_singleton()->viewport_get_texture(
+                        viewport->get_viewport_rid());
+                RIVEGD_POST(rt_set_vm_image_live, p_path, rt_texture, true,
+                            180);
+                return;
+            }
             Ref<Texture2D> texture = p_value;
             if (texture.is_valid()) {
                 RenderingServer* rs = RenderingServer::get_singleton();
                 RenderingDevice* rd = rs->get_rendering_device();
+                // Viewport-style textures adopt unconditionally (the
+                // render thread retries until the render target exists).
+                const bool dynamic =
+                    Object::cast_to<ViewportTexture>(*texture) != nullptr ||
+                    Object::cast_to<Texture2DRD>(*texture) != nullptr;
+                if (dynamic) {
+                    RIVEGD_POST(rt_set_vm_image_live, p_path,
+                                texture->get_rid(), true, 180);
+                    return;
+                }
                 const RID rd_texture =
-                    rs->texture_get_rd_texture(texture->get_rid());
+                    rd != nullptr
+                        ? rs->texture_get_rd_texture(texture->get_rid())
+                        : RID();
                 bool adoptable = rd != nullptr && rd_texture.is_valid();
-                if (adoptable) {
+                if (rd == nullptr &&
+                    rs->texture_get_native_handle(texture->get_rid()) != 0) {
+                    adoptable = true; // GL / web: adopt by GL id
+                }
+                if (adoptable && rd != nullptr) {
                     // Only uncompressed formats adopt directly;
                     // VRAM-compressed imports fall through to the decode
                     // path below.
@@ -260,15 +289,10 @@ void RiveInstance::post_property(const String& p_path, const Variant& p_value) {
                     }
                 }
                 if (adoptable) {
-                    // Viewport-backed textures re-render continuously;
-                    // everything else is treated as static (sleeps
-                    // normally — re-set the property if you mutate it).
-                    const bool dynamic =
-                        Object::cast_to<ViewportTexture>(*texture) !=
-                            nullptr ||
-                        Object::cast_to<Texture2DRD>(*texture) != nullptr;
+                    // Static texture (sleeps normally; re-set the property
+                    // if you mutate it in place).
                     RIVEGD_POST(rt_set_vm_image_live, p_path,
-                                texture->get_rid(), dynamic);
+                                texture->get_rid(), false, 0);
                     return;
                 }
             }

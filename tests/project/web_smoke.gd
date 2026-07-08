@@ -54,4 +54,41 @@ func _process(_delta: float) -> void:
 		if image_a.get_data() == image_b.get_data():
 			verdict("WEB SMOKE FAIL: pixels unchanged after tint write")
 			return
-		verdict("WEB SMOKE OK: load + render + data binding on web")
+		# Live texture on web: a shader-driven SubViewport bound into a
+		# Rive image property must animate without rebinding (GL adopt).
+		_start_live_phase()
+	elif frames == 180:
+		live_a = get_viewport().get_texture().get_image().get_data()
+	elif frames == 240:
+		var live_b := get_viewport().get_texture().get_image().get_data()
+		if live_a == live_b:
+			verdict("WEB SMOKE FAIL: live texture frozen on web")
+			return
+		verdict("WEB SMOKE OK: load + render + data binding + live texture")
+
+
+var live_sprite: Node
+var live_a: PackedByteArray
+
+
+func _start_live_phase() -> void:
+	sprite.queue_free()
+	var vp := SubViewport.new()
+	vp.size = Vector2i(128, 128)
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	var rect := ColorRect.new()
+	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var mat := ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = "shader_type canvas_item; void fragment() { COLOR = vec4(abs(sin(TIME*3.0)), fract(TIME*0.5), abs(cos(TIME*2.0)), 1.0); }"
+	mat.shader = sh
+	rect.material = mat
+	vp.add_child(rect)
+	add_child(vp)
+	live_sprite = ClassDB.instantiate("RiveSprite2D")
+	live_sprite.set("file", load("res://fixtures/data_binding_images_test.riv"))
+	live_sprite.set("artboard", "main")
+	live_sprite.set("size", Vector2i(300, 300))
+	live_sprite.set("position", Vector2(20, 20))
+	add_child(live_sprite)
+	live_sprite.call("set_property", "main_im", vp)

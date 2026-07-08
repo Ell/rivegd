@@ -14,6 +14,11 @@ public:
     static std::unique_ptr<GLBridge> create(std::string* out_error);
     ~GLBridge() override;
 
+    rive::rcp<rive::RenderImage> adopt_texture(uint64_t p_image,
+                                               uint32_t p_width,
+                                               uint32_t p_height,
+                                               uint32_t p_format) override;
+
     rive::gpu::RenderContext* render_context() const override {
         return m_context.get();
     }
