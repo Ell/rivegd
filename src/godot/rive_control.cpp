@@ -19,6 +19,8 @@ namespace rivegd {
 void RiveControl::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_file", "file"), &RiveControl::set_file);
     ClassDB::bind_method(D_METHOD("get_file"), &RiveControl::get_file);
+    ClassDB::bind_method(D_METHOD("get_texture_rid"),
+                         &RiveControl::get_texture_rid);
     ClassDB::bind_method(D_METHOD("set_artboard", "artboard"),
                          &RiveControl::set_artboard);
     ClassDB::bind_method(D_METHOD("get_artboard"), &RiveControl::get_artboard);

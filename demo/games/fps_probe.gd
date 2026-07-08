@@ -33,7 +33,7 @@ func _process(_d):
 			fps.pitch = 0.0
 			fps.camera.global_position = fps.body
 			fps.camera.global_transform.basis = Basis()
-			var uv = fps._screen_uv(fps.terminal_mesh, Vector2(1.2, 1.2))
+			var uv = fps._wall_hit(fps.terminal_center, Vector2(1.36, 1.1))
 			print("FPSPROBE terminal uv=", uv)
 			fps._interact(1)
 			fps._interact(2)
@@ -46,7 +46,7 @@ func _process(_d):
 			fps.body = Vector3(3.5, 1.5 + 0.55 * 2.0 * (0.5 - 0.86), -3.0)
 			fps.camera.global_position = fps.body
 			fps.camera.global_transform.basis = Basis()
-			var uv2 = fps._screen_uv(fps.switch_mesh, Vector2(0.55, 0.55))
+			var uv2 = fps._wall_hit(Vector3(3.5, 1.5, -5.82), Vector2(0.55, 0.55))
 			print("FPSPROBE switch uv=", uv2)
 			fps._interact(1)
 			fps._interact(2)

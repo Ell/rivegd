@@ -137,6 +137,12 @@ public:
                             const godot::String& p_want,
                             const godot::Callable& p_callable);
 
+    // The RenderingServer texture this instance renders into — bind it
+    // into an ImageTexture via RenderingServer.texture_replace to present
+    // Rive on any Texture2D consumer (3D materials, Sprite3D...) on every
+    // renderer, including GL where Texture2DRD is unavailable.
+    godot::RID get_texture_rid() const { return rive.get_canvas_texture_rid(); }
+
 protected:
     static void _bind_methods();
 
