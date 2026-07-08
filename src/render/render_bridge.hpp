@@ -22,6 +22,10 @@ public:
     // GPU resources it owns.
     virtual rive::gpu::RenderContext* render_context() const = 0;
 
+    // True when the backend rasterizes with a bottom-left origin (GL):
+    // presentation must flip Y or content appears upside down.
+    virtual bool output_flipped() const { return false; }
+
     // Wraps an externally-owned native texture (VkImage on the Vulkan
     // bridge) as a rive RenderImage sampled IN PLACE — contents update
     // live with zero copies. p_native_format is the backend's native

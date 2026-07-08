@@ -836,6 +836,12 @@ void RiveRenderServer::rt_render_instance(int64_t p_instance_id,
 
     rive::RiveRenderer renderer(bridge->render_context());
     renderer.save();
+    if (bridge->output_flipped()) {
+        // GL rasterizes bottom-up relative to Godot's sampling; flip Y
+        // around the texture centerline so content presents upright.
+        renderer.transform(rive::Mat2D(
+            1, 0, 0, -1, 0, float(instance->size.y)));
+    }
     const FitTransform fit = compute_fit(
         instance->fit, instance->align_x, instance->align_y,
         instance->artboard->width(), instance->artboard->height(),
@@ -1895,6 +1901,10 @@ void RiveRenderServer::rt_render_thumbnail(const PackedByteArray& p_data,
             bridge->begin_frame(size.x, size.y, 0x00000000);
             rive::RiveRenderer renderer(bridge->render_context());
             renderer.save();
+            if (bridge->output_flipped()) {
+                renderer.transform(rive::Mat2D(
+                    1, 0, 0, -1, 0, float(size.y)));
+            }
             const ContainFit fit =
                 contain_fit(artboard->width(), artboard->height(),
                             float(size.x), float(size.y));

@@ -10,7 +10,7 @@ var body := Vector3(0, 1.6, 4)
 var yaw := 0.0
 var pitch := 0.0
 var term_vp: SubViewport
-var terminal_ui: RiveControl
+var shop_items: Array = []
 var lamp_on := true
 var switch_vp: SubViewport
 var switch_ui: RiveControl
@@ -77,25 +77,26 @@ func _ready() -> void:
 			Vector2(24, 18), Color(0.5, 0.9, 0.7)))
 	term_vp.add_child(GameUI.label("click a crate to purchase", 14,
 			Vector2(24, 52), Color(1, 1, 1, 0.5)))
-	terminal_ui = RiveControl.new()
-	terminal_ui.file = load("res://fixtures/cards.riv")
-	terminal_ui.artboard = "cards"
-	terminal_ui.position = Vector2(0, 80)
-	terminal_ui.size = Vector2(512, 432)
-	terminal_ui.fit = 3 # width
-	term_vp.add_child(terminal_ui)
+	for i in 4:
+		var item := RiveControl.new()
+		item.file = load("res://fixtures/cards.riv")
+		item.artboard = "shop_item"
+		item.position = Vector2(10 + (i % 2) * 250, 92 + (i / 2) * 208)
+		item.size = Vector2(242, 198)
+		term_vp.add_child(item)
+		item.loaded.connect(func():
+			item.set_property("label", "CRATE %d" % (i + 1))
+			item.set_property("price", "%d G" % (25 * (i + 1)))
+			item.set_property("tint", Color.from_hsv(0.08 + i * 0.18, 0.75, 0.9))
+			item.set_property("sold", 1.0), CONNECT_ONE_SHOT)
+		shop_items.push_back(item)
 	var term_mat := StandardMaterial3D.new()
 	term_mat.albedo_texture = term_vp.get_texture()
 	term_mat.emission_enabled = true
 	term_mat.emission_texture = term_vp.get_texture()
 	term_mat.emission_energy_multiplier = 1.4
-	terminal_mesh = _box(Vector3(0, 1.7, -5.85), Vector3(2.4, 2.4, 0.1), term_mat)
-	terminal_ui.loaded.connect(func():
-		for i in 4:
-			terminal_ui.list_append("items", "CardVM")
-			terminal_ui.list_set_property("items", i, "value", 0.25 * (i + 1))
-			terminal_ui.list_set_property("items", i, "tint",
-					Color.from_hsv(0.08 + i * 0.18, 0.75, 0.9)), CONNECT_ONE_SHOT)
+	_box(Vector3(0, 1.7, -5.88), Vector3(2.6, 2.6, 0.08), wall_mat) # bezel
+	terminal_mesh = _screen(Vector3(0, 1.7, -5.82), 2.4, 2.4, term_mat)
 
 	# Light switch screen: the light_switch artboard's own Click listener
 	# toggles its lamp; we watch the state and drive the room light.
@@ -113,7 +114,8 @@ func _ready() -> void:
 	sw_mat.albedo_texture = switch_vp.get_texture()
 	sw_mat.emission_enabled = true
 	sw_mat.emission_texture = switch_vp.get_texture()
-	switch_mesh = _box(Vector3(3.5, 1.5, -5.85), Vector3(1.1, 1.1, 0.1), sw_mat)
+	_box(Vector3(3.5, 1.5, -5.88), Vector3(1.3, 1.3, 0.08), wall_mat) # bezel
+	switch_mesh = _screen(Vector3(3.5, 1.5, -5.82), 1.1, 1.1, sw_mat)
 	# The artboard's click listener toggles its state machine; mirror the
 	# lamp state onto the room light.
 	switch_ui.state_changed.connect(func(state):
@@ -149,6 +151,18 @@ func _panel_texture(base: Color, line: Color) -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
+func _screen(pos: Vector3, w: float, h: float, mat: Material) -> MeshInstance3D:
+	# Full-texture quad (BoxMesh atlases its six faces across the UV space).
+	var m := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(w, h)
+	quad.material = mat
+	m.mesh = quad
+	m.position = pos
+	world.add_child(m)
+	return m
+
+
 func _box(pos: Vector3, box_size: Vector3, mat: Material) -> MeshInstance3D:
 	var m := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
@@ -165,14 +179,15 @@ func _buy(index: int) -> void:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = _panel_texture(Color(0.85, 0.5, 0.15), Color(0.6, 0.32, 0.08))
 	_box(Vector3(-3, 1.0 + blocks * 0.45, -3), Vector3(0.4, 0.4, 0.4), mat)
-	terminal_ui.list_set_property("items", index, "tint", Color(0.25, 0.25, 0.28))
+	shop_items[index].set_property("sold", 0.3)
+	shop_items[index].set_property("price", "SOLD")
 
 
 func _screen_uv(mesh: MeshInstance3D, half: Vector2) -> Variant:
 	# Ray from camera center to the screen plane (walls face +Z).
 	var origin := camera.global_position
 	var dir := -camera.global_transform.basis.z
-	var plane_z: float = mesh.position.z + 0.06
+	var plane_z: float = mesh.position.z + 0.01
 	if absf(dir.z) < 0.0001:
 		return null
 	var t := (plane_z - origin.z) / dir.z
@@ -188,12 +203,10 @@ func _screen_uv(mesh: MeshInstance3D, half: Vector2) -> Variant:
 func _interact(phase: int) -> void:
 	var uv = _screen_uv(terminal_mesh, Vector2(1.2, 1.2))
 	if uv != null:
-		var p: Vector2 = uv * 512.0 - terminal_ui.position
-		terminal_ui.send_pointer_event(phase, p)
-		if phase == 1:
-			# cards flow left to right at ~170px each after grid padding
-			var idx := int((p.x - 8.0) / 170.0)
-			if p.y > 20 and p.y < 260 and idx >= 0 and idx < 4:
+		var p: Vector2 = uv * 512.0
+		if phase == 1 and p.y > 92:
+			var idx := int(p.x / 256.0) + 2 * int((p.y - 92.0) / 208.0)
+			if idx >= 0 and idx < 4:
 				_buy(idx)
 		return
 	uv = _screen_uv(switch_mesh, Vector2(0.55, 0.55))

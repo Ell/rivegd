@@ -1,15 +1,14 @@
 extends Node
 var frames := 0
 var main: Node
-func key(code: int) -> void:
+func key_state(code: int, pressed: bool) -> void:
 	var ev := InputEventKey.new()
 	ev.keycode = code
-	ev.pressed = true
+	ev.pressed = pressed
 	Input.parse_input_event(ev)
-	var up := InputEventKey.new()
-	up.keycode = code
-	up.pressed = false
-	Input.parse_input_event(up)
+func tap(code: int) -> void:
+	key_state(code, true)
+	key_state(code, false)
 func _ready():
 	DisplayServer.window_set_size(Vector2i(1100, 660))
 	main = load("res://games/main.gd").new()
@@ -19,18 +18,20 @@ func _ready():
 func _process(_d):
 	frames += 1
 	match frames:
-		30, 34, 38: key(KEY_W)      # walk toward Mira at (9,4)
-		42, 46: key(KEY_A)
-		60: key(KEY_E)               # talk
-		90:
+		30: key_state(KEY_W, true)      # hold north toward Mira
+		75: key_state(KEY_W, false)
+		76: key_state(KEY_A, true)      # drift west
+		100: key_state(KEY_A, false)
+		110: tap(KEY_E)                  # talk
+		160:
 			var jrpg = main.current
-			print("DLG TEXT: '", jrpg.dlg_text.text, "' visible=", jrpg.dlg_panel.visible)
+			print("DLG visible=", jrpg.dlg_panel.visible, " talking=", jrpg.talking)
 			get_viewport().get_texture().get_image().save_png(
 				ProjectSettings.globalize_path("res://") + "../out/play_dialogue.png")
-			key(KEY_E)
-		100: key(KEY_E)              # close (2 lines) -> +5 gold
-		120: key(KEY_P)              # party screen
-		150:
+			tap(KEY_E)
+		175: tap(KEY_E)                  # close (2 lines) -> +5 gold
+		195: tap(KEY_P)                  # party screen
+		225:
 			get_viewport().get_texture().get_image().save_png(
 				ProjectSettings.globalize_path("res://") + "../out/play_party.png")
 			get_tree().quit(0)

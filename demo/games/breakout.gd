@@ -15,7 +15,6 @@ var lives := 3
 var total := 0
 var hud_score: RiveControl
 var hud_lives: RiveControl
-var score_label: Label
 var playing := false
 var msg: Label
 var trail: CPUParticles2D
@@ -41,17 +40,15 @@ func _ready() -> void:
 	add_child(strip)
 	hud_score = RiveControl.new()
 	hud_score.file = load("res://fixtures/cards.riv")
-	hud_score.artboard = "card"
-	hud_score.position = Vector2(76, 18)
-	hud_score.size = Vector2(44, 62)
+	hud_score.artboard = "hud_panel"
+	hud_score.position = Vector2(72, 6)
+	hud_score.size = Vector2(210, 86)
 	hud_score.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(hud_score)
 	hud_score.loaded.connect(func():
+		hud_score.set_property("title", "SCORE 0")
 		hud_score.set_property("tint", Color(0.95, 0.6, 0.15))
 		hud_score.set_property("value", 0.0), CONNECT_ONE_SHOT)
-	add_child(GameUI.label("BREAKOUT", 20, Vector2(136, 22), Color.WHITE, true))
-	score_label = GameUI.label("SCORE 0", 16, Vector2(136, 52), Color(0.95, 0.85, 0.4))
-	add_child(score_label)
 	add_child(GameUI.label("LIVES", 14, Vector2(806, 34), Color(1, 1, 1, 0.6)))
 	hud_lives = RiveControl.new()
 	hud_lives.file = load("res://fixtures/cards.riv")
@@ -139,7 +136,7 @@ func _process(delta: float) -> void:
 			bricks.erase(b)
 			ball_vel.y = -ball_vel.y
 			score += 10
-			score_label.text = "SCORE %d" % score
+			hud_score.set_property("title", "SCORE %d" % score)
 			hud_score.set_property("value", 1.0 - bricks.size() / float(total))
 			if bricks.is_empty():
 				msg.text = "YOU WIN  —  ESC FOR MENU"

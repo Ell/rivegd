@@ -20,6 +20,12 @@ func _process(_d):
 	frames += 1
 	var fps = main.current
 	match frames:
+		38:
+			var fps0 = main.current
+			print("FPSPROBE shop_items=", fps0.shop_items.size())
+			for it in fps0.shop_items:
+				print("FPSPROBE item pos=", it.position, " visible=", it.visible,
+						" size=", it.size)
 		40:
 			# Stand in front of the terminal, face it dead on (-Z).
 			fps.body = Vector3(-0.6, 1.7, -2.0)

@@ -19,6 +19,8 @@ public:
                                                uint32_t p_height,
                                                uint32_t p_format) override;
 
+    bool output_flipped() const override { return true; }
+
     rive::gpu::RenderContext* render_context() const override {
         return m_context.get();
     }

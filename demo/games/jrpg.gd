@@ -1,19 +1,20 @@
-# Riveton — a small town scene. Rive drives the UI surfaces: the status
-# card (data binding), the dialogue box portrait (live image property),
-# and the party screen (a Rive list, one card per member).
-# WASD/arrows move, E talks, P toggles the party screen.
+# Riveton — open meadow, smooth movement. Rive drives the UI: the status
+# panel (hud_panel artboard), the dialogue box (dialogue artboard with
+# bound speaker/line text — the typewriter types into the Rive property),
+# and the party screen (a Rive list). WASD/arrows move, E talks, P party.
 extends Control
 
 const TILE := 48
 const MAP_W := 22
 const MAP_H := 14
+const SPEED := 230.0
 
 const NPCS := [
-	{"name": "Mira", "pos": Vector2(9, 4), "tint": Color(0.85, 0.4, 0.5), "face": 0,
+	{"name": "Mira", "pos": Vector2(9.0, 4.0), "tint": Color(0.85, 0.4, 0.5),
 		"lines": ["Welcome to Riveton, traveler!", "The old terminal in the tower\nstill hums at night..."]},
-	{"name": "Bosk", "pos": Vector2(5, 9), "tint": Color(0.4, 0.6, 0.85), "face": 1,
+	{"name": "Bosk", "pos": Vector2(5.0, 9.0), "tint": Color(0.4, 0.6, 0.85),
 		"lines": ["I saw the tavern cards stack\nthemselves this morning.", "Data binding, the elders call it."]},
-	{"name": "Twig", "pos": Vector2(15, 9), "tint": Color(0.5, 0.8, 0.4), "face": 2,
+	{"name": "Twig", "pos": Vector2(15.0, 9.0), "tint": Color(0.5, 0.8, 0.4),
 		"lines": ["Press P to inspect our party!", "We all live in one .riv file,\nyou know."]},
 ]
 const PARTY := [
@@ -23,23 +24,24 @@ const PARTY := [
 
 var world: Node2D
 var player: Sprite2D
-var player_cell := Vector2(11, 7)
+var player_pos := Vector2(11, 7) * TILE   # pixels, feet point
 var facing := 0 # 0 down, 1 up, 2 left, 3 right
 var walk_frame := 0
+var walk_clock := 0.0
 var sheet: Texture2D
 var npc_sheet: Texture2D
-var blocked := {}
+var obstacles: Array = []                 # [center: Vector2, radius: float]
 var hud: RiveControl
+var dialogue_box: RiveControl
 var portrait_rect: TextureRect
 var dlg_panel: Control
-var dlg_text: Label
-var dlg_name: Label
 var party_panel: Control
 var talking := -1
 var line := 0
 var typed := 0.0
 var gold := 0
 var hp := 0.9
+var help_label: Label
 
 
 func _sub(tex: Texture2D, region: Rect2) -> ImageTexture:
@@ -61,58 +63,33 @@ func _tile(tex: Texture2D, tx: int, ty: int, cell: Vector2, w := 1, h := 1,
 	return s
 
 
-func _block(cell: Vector2, w := 1, h := 1) -> void:
-	for dx in w:
-		for dy in h:
-			blocked[cell + Vector2(dx, dy)] = true
-
-
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	world = Node2D.new()
-	world.z_index = -20 # sprites use z_index 0..10; keep ALL below the UI
+	world.z_index = -20
 	add_child(world)
 	var overworld: Texture2D = load("res://games/assets/overworld.png")
 	sheet = load("res://games/assets/character.png")
 	npc_sheet = load("res://games/assets/npc.png")
 	seed(7)
 
-	# Ground: grass variants everywhere, sandy plaza in the middle.
 	var grass_tiles := [Vector2(4, 9), Vector2(5, 9), Vector2(6, 9), Vector2(5, 10), Vector2(7, 10)]
 	for x in MAP_W:
 		for y in MAP_H:
 			var g: Vector2 = grass_tiles[randi() % grass_tiles.size()]
 			_tile(overworld, int(g.x), int(g.y), Vector2(x, y))
-	# Fountain centerpiece.
-	_tile(overworld, 22, 9, Vector2(10.4, 7.2), 2, 2, 5)
-	_block(Vector2(10, 7), 2, 2)
-
-	# Flower + sprout decoration.
-	for i in 26:
-		var cell := Vector2(randi() % MAP_W, randi() % MAP_H)
-		if blocked.has(cell) or (cell.x >= 8 and cell.x < 14 and cell.y >= 6 and cell.y < 10):
-			continue
+	for i in 22:
+		var cell := Vector2(1 + randi() % (MAP_W - 2), 1 + randi() % (MAP_H - 2))
 		_tile(overworld, 3 if i % 2 == 0 else 0, 11 if i % 2 == 0 else 8, cell)
-
-	# Hedge border (keeps the player in-world).
 	for x in MAP_W:
 		_tile(overworld, 1, 13, Vector2(x, 0), 1, 1, 4)
 		_tile(overworld, 1, 13, Vector2(x, MAP_H - 1), 1, 1, 4)
-		_block(Vector2(x, 0)); _block(Vector2(x, MAP_H - 1))
 	for y in MAP_H:
 		_tile(overworld, 1, 13, Vector2(0, y), 1, 1, 4)
 		_tile(overworld, 1, 13, Vector2(MAP_W - 1, y), 1, 1, 4)
-		_block(Vector2(0, y)); _block(Vector2(MAP_W - 1, y))
-
-	# Houses + trees + pond.
-	for house in [Vector2(2, 1.6), Vector2(12.5, 1.4), Vector2(17, 8.4)]:
-		_tile(overworld, 6, 0, house, 5, 5, 8)
-		_block(Vector2(house.x, house.y + 1.4).floor(), 5, 3)
-	for bush in [Vector2(6, 2), Vector2(16, 3.4), Vector2(3, 10.6), Vector2(19, 5), Vector2(12, 11.5)]:
+	for bush in [Vector2(5, 3), Vector2(16, 4), Vector2(4, 10), Vector2(18, 9)]:
 		_tile(overworld, 3, 14, bush, 1, 1, 8)
-		_block(bush.floor())
-	_tile(overworld, 2, 6, Vector2(6.4, 10.8), 3, 3, 2)
-	_block(Vector2(6, 10), 3, 3)
+		obstacles.push_back([bush * TILE + Vector2(24, 30), 26.0])
 
 	for i in NPCS.size():
 		var npc := Sprite2D.new()
@@ -120,10 +97,10 @@ func _ready() -> void:
 		npc.scale = Vector2(3, 3)
 		npc.centered = false
 		npc.modulate = NPCS[i]["tint"].lightened(0.55)
-		npc.position = NPCS[i]["pos"] * TILE + Vector2(0, TILE) - Vector2(0, 84)
+		npc.position = NPCS[i]["pos"] * TILE - Vector2(0, 48)
 		npc.z_index = 10
 		world.add_child(npc)
-		_block(NPCS[i]["pos"])
+		obstacles.push_back([NPCS[i]["pos"] * TILE + Vector2(24, 24), 30.0])
 
 	player = Sprite2D.new()
 	player.scale = Vector2(3, 3)
@@ -132,53 +109,50 @@ func _ready() -> void:
 	world.add_child(player)
 	_update_player_sprite()
 
-	# --- Rive UI layer ---
-	var status := GameUI.panel(Vector2(14, 12), Vector2(196, 78))
-	add_child(status)
+	# Status panel: the hud_panel Rive artboard, all data binding.
 	hud = RiveControl.new()
 	hud.file = load("res://fixtures/cards.riv")
-	hud.artboard = "card"
-	hud.position = Vector2(24, 20)
-	hud.size = Vector2(44, 62)
+	hud.artboard = "hud_panel"
+	hud.position = Vector2(14, 12)
+	hud.size = Vector2(240, 100)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(hud)
 	hud.loaded.connect(_hud_refresh, CONNECT_ONE_SHOT)
-	add_child(GameUI.label("HERO", 16, Vector2(82, 24), Color(1, 0.9, 0.6)))
-	gold_label = GameUI.label("0 G", 15, Vector2(82, 50), Color(0.95, 0.85, 0.4))
-	add_child(gold_label)
 
 	help_label = GameUI.label("WASD move   E talk   P party   ESC menu", 13,
 			Vector2(360, 644), Color(1, 1, 1, 0.55))
 	add_child(help_label)
 
-	# Dialogue panel (hidden until talking).
+	# Dialogue: the dialogue Rive artboard; Godot overlays only the
+	# pixel-art portrait into the artboard's portrait slot.
 	dlg_panel = Control.new()
 	dlg_panel.visible = false
 	add_child(dlg_panel)
-	var dlg_box := GameUI.panel(Vector2(150, 470), Vector2(800, 172), Color(0.85, 0.7, 0.35))
-	dlg_panel.add_child(dlg_box)
-	var frame := GameUI.panel(Vector2(170, 442), Vector2(150, 150), Color(0.85, 0.7, 0.35), Color(0.12, 0.1, 0.09))
-	dlg_panel.add_child(frame)
+	dialogue_box = RiveControl.new()
+	dialogue_box.file = load("res://fixtures/cards.riv")
+	dialogue_box.artboard = "dialogue"
+	dialogue_box.position = Vector2(140, 458)
+	dialogue_box.size = Vector2(820, 190)
+	dialogue_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dlg_panel.add_child(dialogue_box)
 	portrait_rect = TextureRect.new()
-	portrait_rect.position = Vector2(182, 454)
-	portrait_rect.size = Vector2(126, 126)
+	portrait_rect.position = dialogue_box.position + Vector2(24, 24)
+	portrait_rect.size = Vector2(134, 134)
 	portrait_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	portrait_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	dlg_panel.add_child(portrait_rect)
-	dlg_name = GameUI.label("", 18, Vector2(344, 486), Color(1, 0.85, 0.4))
-	dlg_panel.add_child(dlg_name)
-	dlg_text = GameUI.label("", 20, Vector2(344, 520))
-	dlg_panel.add_child(dlg_text)
-	dlg_panel.add_child(GameUI.label("E  ▸", 14, Vector2(880, 606), Color(1, 1, 1, 0.5)))
+	dlg_panel.add_child(GameUI.label("E ▸", 14, dialogue_box.position + Vector2(770, 156),
+			Color(1, 1, 1, 0.5)))
 
-	# Party screen.
+	# Party screen: unchanged Rive list.
 	party_panel = Control.new()
 	party_panel.visible = false
 	add_child(party_panel)
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.55)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	party_panel.add_child(dim)
 	var pp := GameUI.panel(Vector2(190, 80), Vector2(720, 500), Color(0.55, 0.65, 0.95))
 	party_panel.add_child(pp)
@@ -200,51 +174,65 @@ func _ready() -> void:
 				Vector2(248 + (i % 3) * 172, 566 if i >= 3 else 336)))
 
 
-var gold_label: Label
-var help_label: Label
-
-
 func _hud_refresh() -> void:
+	hud.set_property("title", "%d G" % gold)
 	hud.set_property("value", hp)
-	hud.set_property("tint", Color(0.3, 0.7, 0.4) if hp > 0.5 else Color(0.9, 0.4, 0.2))
-	if gold_label != null:
-		gold_label.text = "%d G" % gold
+	hud.set_property("tint", Color(0.34, 0.75, 0.54) if hp > 0.5 else Color(0.9, 0.4, 0.2))
 
 
 func _update_player_sprite() -> void:
-	# character.png: 16x32 cells, 4 walk frames per row; rows: 0 down,
-	# 2 up, 3 side (flip_h for left).
 	var row := 0
 	match facing:
 		1: row = 2
 		2, 3: row = 3
 	player.flip_h = facing == 2
 	player.texture = _sub(sheet, Rect2(walk_frame * 16, row * 32, 16, 32))
-	player.position = player_cell * TILE + Vector2(0, TILE) - Vector2(0, 84)
-
-
-func _move_player(dir: Vector2, face: int) -> void:
-	facing = face
-	walk_frame = (walk_frame + 1) % 4
-	var next := player_cell + dir
-	if not blocked.has(next) and next.x >= 0 and next.y >= 0 \
-			and next.x < MAP_W and next.y < MAP_H:
-		player_cell = next
-	_update_player_sprite()
+	player.position = player_pos + Vector2(-24, -84)
 
 
 func _npc_near() -> int:
 	for i in NPCS.size():
-		if NPCS[i]["pos"].distance_to(player_cell) <= 1.5:
+		var center: Vector2 = NPCS[i]["pos"] * TILE + Vector2(24, 24)
+		if center.distance_to(player_pos) <= 78.0:
 			return i
 	return -1
 
 
 func _process(delta: float) -> void:
-	if talking >= 0 and dlg_text != null:
+	# Typewriter into the Rive-bound line property.
+	if talking >= 0:
 		var full: String = NPCS[talking]["lines"][line]
+		var prev := int(typed)
 		typed = min(typed + delta * 40.0, full.length())
-		dlg_text.text = full.substr(0, int(typed))
+		if int(typed) != prev:
+			dialogue_box.set_property("line", full.substr(0, int(typed)))
+		return
+
+	# Smooth movement.
+	var wish := Vector2.ZERO
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP): wish.y -= 1
+	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN): wish.y += 1
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT): wish.x -= 1
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): wish.x += 1
+	if wish != Vector2.ZERO:
+		wish = wish.normalized()
+		var next := player_pos + wish * SPEED * delta
+		next.x = clamp(next.x, TILE + 14.0, (MAP_W - 1) * TILE - 14.0)
+		next.y = clamp(next.y, TILE + 30.0, (MAP_H - 1) * TILE - 6.0)
+		for ob in obstacles:
+			var away: Vector2 = next - ob[0]
+			if away.length() < ob[1]:
+				next = ob[0] + away.normalized() * ob[1]
+		player_pos = next
+		facing = 3 if wish.x > 0.3 else 2 if wish.x < -0.3 \
+				else 1 if wish.y < 0 else 0
+		walk_clock += delta
+		if walk_clock > 0.14:
+			walk_clock = 0.0
+			walk_frame = (walk_frame + 1) % 4
+	else:
+		walk_frame = 0
+	_update_player_sprite()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -255,21 +243,21 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			var full: String = NPCS[talking]["lines"][line]
 			if typed < full.length():
 				typed = full.length()
+				dialogue_box.set_property("line", full)
 				return
 			line += 1
 			typed = 0.0
 			if line >= NPCS[talking]["lines"].size():
 				talking = -1
+				dialogue_box.set_property("shown", 0.0)
 				dlg_panel.visible = false
 				help_label.visible = true
 				gold += 5
 				_hud_refresh()
+			else:
+				dialogue_box.set_property("line", "")
 		return
 	match event.keycode:
-		KEY_W, KEY_UP: _move_player(Vector2(0, -1), 1)
-		KEY_S, KEY_DOWN: _move_player(Vector2(0, 1), 0)
-		KEY_A, KEY_LEFT: _move_player(Vector2(-1, 0), 2)
-		KEY_D, KEY_RIGHT: _move_player(Vector2(1, 0), 3)
 		KEY_P: party_panel.visible = not party_panel.visible
 		KEY_E:
 			var i := _npc_near()
@@ -279,8 +267,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				typed = 0.0
 				dlg_panel.visible = true
 				help_label.visible = false
-				dlg_name.text = NPCS[i]["name"]
-				var face := _sub(npc_sheet, Rect2(i * 16, 2, 16, 14)).get_image()
+				var fade := create_tween()
+				fade.tween_method(func(v): dialogue_box.set_property("shown", v),
+						0.0, 1.0, 0.18)
+				dialogue_box.set_property("speaker", NPCS[i]["name"])
+				dialogue_box.set_property("line", "")
+				# Portrait: the villager's head, tinted to match.
+				var face := _sub(npc_sheet, Rect2(i * 16 + 1, 2, 14, 13)).get_image()
 				var tint: Color = NPCS[i]["tint"].lightened(0.55)
 				for px in face.get_width():
 					for py in face.get_height():

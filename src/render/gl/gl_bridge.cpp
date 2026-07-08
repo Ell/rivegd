@@ -122,6 +122,9 @@ void GLBridge::begin_frame(uint32_t width, uint32_t height,
     descriptor.renderTargetHeight = height;
     descriptor.loadAction = rive::gpu::LoadAction::clear;
     descriptor.clearColor = clear_color_argb;
+    // WebGL2/GLES has no pixel-local-storage path here; MSAA keeps vector
+    // edges antialiased (mirrors rive's own web runtime fallback).
+    descriptor.msaaSampleCount = 4;
     m_context->beginFrame(descriptor);
 }
 

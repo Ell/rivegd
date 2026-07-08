@@ -24,33 +24,30 @@ func _ready() -> void:
 			15, Vector2(76, 152), Color(0.65, 0.75, 1.0, 0.8)))
 
 	for i in TILES.size():
-		var frame := GameUI.panel(Vector2(66 + i * 340, 208), Vector2(300, 384),
+		var frame := GameUI.panel(Vector2(66 + i * 340, 208), Vector2(300, 388),
 				TILES[i][2].darkened(0.1))
 		add_child(frame)
 		var card := RiveControl.new()
 		card.file = load("res://fixtures/cards.riv")
-		card.artboard = "card"
+		card.artboard = "menu_card"
 		card.position = Vector2(80 + i * 340, 222)
-		card.size = Vector2(272, 310)
+		card.size = Vector2(272, 360)
 		add_child(card)
 		card.loaded.connect(_style.bind(card, i), CONNECT_ONE_SHOT)
 		card.gui_input.connect(_clicked.bind(i))
 		card.mouse_entered.connect(func():
-			card.set_property("value", 1.0)
-			frame.scale = Vector2(1.02, 1.02))
+			card.set_property("hover", 1.0))
 		card.mouse_exited.connect(func():
-			card.set_property("value", 0.35)
-			frame.scale = Vector2.ONE)
-		add_child(GameUI.label(TILES[i][0], 24, Vector2(84 + i * 340, 542), Color.WHITE, true))
-		add_child(GameUI.label(TILES[i][3], 13, Vector2(84 + i * 340, 572), Color(1, 1, 1, 0.5)))
+			card.set_property("hover", 0.0))
 
 	add_child(GameUI.label("ESC returns here from any game", 13,
 			Vector2(420, 636), Color(1, 1, 1, 0.4)))
 
 
 func _style(card: RiveControl, i: int) -> void:
+	card.set_property("label", TILES[i][0])
+	card.set_property("sub", TILES[i][3])
 	card.set_property("tint", TILES[i][2])
-	card.set_property("value", 0.35)
 
 
 func _clicked(event: InputEvent, i: int) -> void:
