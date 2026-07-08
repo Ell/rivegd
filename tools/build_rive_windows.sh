@@ -34,8 +34,8 @@ GCC_DIR_FLAG=""
 if [ -n "$GCC_POSIX_DIR" ]; then
     GCC_DIR_FLAG="--gcc-install-dir=$GCC_POSIX_DIR"
 fi
-printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 %s -fuse-ld=lld "$@"\n' "$CLANG_BIN" "$GCC_DIR_FLAG" > "$SHIM_DIR/clang"
-printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 %s -fuse-ld=lld "$@"\n' "$CLANGXX_BIN" "$GCC_DIR_FLAG" > "$SHIM_DIR/clang++"
+printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 %s -Qunused-arguments -fuse-ld=lld "$@"\n' "$CLANG_BIN" "$GCC_DIR_FLAG" > "$SHIM_DIR/clang"
+printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 %s -Qunused-arguments -fuse-ld=lld "$@"\n' "$CLANGXX_BIN" "$GCC_DIR_FLAG" > "$SHIM_DIR/clang++"
 cat > "$SHIM_DIR/fxc" <<'EOF'
 #!/usr/bin/env bash
 out=""; prev=""
