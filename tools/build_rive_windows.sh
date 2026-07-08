@@ -22,30 +22,36 @@ command -v clang++ >/dev/null || { echo "clang required"; exit 1; }
 
 SHIM_DIR="$(mktemp -d)"
 trap 'rm -rf "$SHIM_DIR"; git checkout -q -- premake5_pls_renderer.lua' EXIT
-# Absolute compiler paths: the shim dir leads PATH, so a bare "clang"
-# here would resolve to the shim itself and re-exec forever.
-CLANG_BIN="$(command -v clang)"
-CLANGXX_BIN="$(command -v clang++)"
+# Absolute compiler paths, preferring the system clang: the shim dir
+# leads PATH (a bare "clang" would resolve to the shim itself and re-exec
+# forever), and PATH may otherwise resolve to bundled toolchains (Swift's
+# clang 17 clashes with modern mingw headers over __cpuidex).
+CLANG_BIN="${RIVEGD_CLANG:-$([ -x /usr/bin/clang ] && echo /usr/bin/clang || command -v clang)}"
+CLANGXX_BIN="${RIVEGD_CLANGXX:-$([ -x /usr/bin/clang++ ] && echo /usr/bin/clang++ || command -v clang++)}"
 # Distros shipping both mingw thread models (Ubuntu) need clang pinned to
 # the posix GCC install, or its libstdc++ headers inline win32-model
 # gthread calls (__gthr_win32_*) the posix runtime can't satisfy at link.
 GCC_POSIX_DIR="$(ls -d /usr/lib/gcc/x86_64-w64-mingw32/*-posix 2>/dev/null | sort -V | tail -1 || true)"
-GCC_DIR_FLAG=""
+EXTRA_C=""
+EXTRA_CXX=""
 if [ -n "$GCC_POSIX_DIR" ]; then
-    GCC_DIR_FLAG="--gcc-install-dir=$GCC_POSIX_DIR"
+    # Force the posix flavor outright: pin the GCC install for libgcc and
+    # replace the default C++ header search with the posix set
+    # (clang's install autodetection can otherwise pick the win32 model,
+    # whose gthreads are unresolvable at final link).
+    EXTRA_C="--gcc-install-dir=$GCC_POSIX_DIR"
+    EXTRA_CXX="$EXTRA_C -nostdinc++ -isystem $GCC_POSIX_DIR/include/c++ -isystem $GCC_POSIX_DIR/include/c++/x86_64-w64-mingw32 -isystem $GCC_POSIX_DIR/include/c++/backward"
 fi
-printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 %s -Qunused-arguments -fuse-ld=lld "$@"\n' "$CLANG_BIN" "$GCC_DIR_FLAG" > "$SHIM_DIR/clang"
-printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 %s -Qunused-arguments -fuse-ld=lld "$@"\n' "$CLANGXX_BIN" "$GCC_DIR_FLAG" > "$SHIM_DIR/clang++"
+printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 %s -Qunused-arguments -fuse-ld=lld "$@"\n' "$CLANG_BIN" "$EXTRA_C" > "$SHIM_DIR/clang"
+printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 %s -Qunused-arguments -fuse-ld=lld "$@"\n' "$CLANGXX_BIN" "$EXTRA_CXX" > "$SHIM_DIR/clang++"
 chmod +x "$SHIM_DIR/clang" "$SHIM_DIR/clang++"
-# Fail fast if clang would compile against win32-model libstdc++ headers
-# (their gthreads land as unresolvable __gthr_win32_* at final link).
-echo "mingw GCC install pin: ${GCC_DIR_FLAG:-<default>}"
-FLAVOR="$(echo '#include <mutex>' | "$SHIM_DIR/clang++" -x c++ - -E 2>/dev/null | grep -m1 -oE '/usr/lib/gcc/x86_64-w64-mingw32/[^/]*' | head -1)"
+# Report (and gate on) the libstdc++ flavor the shim actually resolves.
+echo "mingw GCC posix dir: ${GCC_POSIX_DIR:-<single-flavor distro>}"
+FLAVOR="$(echo '#include <mutex>' | "$SHIM_DIR/clang++" -x c++ - -E 2>/dev/null | grep -m1 -oE '/usr/lib/gcc/x86_64-w64-mingw32/[^/]+' || true)"
 echo "libstdc++ headers from: ${FLAVOR:-<system default>}"
 case "$FLAVOR" in
     *-win32)
-        echo "ERROR: clang resolves the win32-thread-model mingw headers;"
-        echo "install g++-mingw-w64-x86-64-posix (and its runtime)." >&2
+        echo "ERROR: clang still resolves win32-thread-model mingw headers" >&2
         exit 1
         ;;
 esac

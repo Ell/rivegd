@@ -188,6 +188,11 @@
 		</member>
 	</members>
 	<signals>
+		<signal name="loaded">
+			<description>
+				Emitted when the Rive instance becomes live (first frame bound) — reads and pointer input are meaningful from here. Re-fires after recreates.
+			</description>
+		</signal>
 		<signal name="rive_event">
 			<param index="0" name="name" type="String" />
 			<param index="1" name="properties" type="Dictionary" />

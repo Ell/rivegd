@@ -120,6 +120,7 @@ void RiveTexture::_bind_methods() {
                               PROPERTY_HINT_RANGE, "0,4,0.01,or_greater"),
                  "set_speed_scale", "get_speed_scale");
 
+    ADD_SIGNAL(MethodInfo("loaded"));
     ADD_SIGNAL(MethodInfo("rive_event",
                           PropertyInfo(Variant::STRING, "name"),
                           PropertyInfo(Variant::DICTIONARY, "properties")));
@@ -312,6 +313,7 @@ void RiveTexture::on_frame_pre_draw() {
         rive.frame(delta);
     }
     if (rive.update_texture_binding()) {
+        emit_signal("loaded");
         if (rive.get_rd_texture_rid().is_valid()) {
             set_texture_rd_rid(rive.get_rd_texture_rid());
         } else {

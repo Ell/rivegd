@@ -22,6 +22,11 @@ if env["platform"] == "windows":
 is_web = env["platform"] == "web"
 is_windows = env["platform"] == "windows"
 
+# Platform-suffixed objects: linux/windows/web builds otherwise share
+# object paths and clobber each other (stale-mix links that fail at
+# runtime, not link time).
+env["SHOBJSUFFIX"] = ".%s%s" % (env["platform"], env["SHOBJSUFFIX"])
+
 # Stage-1 output. build_rive.sh puts release builds in out/release and
 # wasm builds in out/wasm_release (tools/build_rive_web.sh).
 rive_out = ARGUMENTS.get(
