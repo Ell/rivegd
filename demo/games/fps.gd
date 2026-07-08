@@ -20,6 +20,8 @@ var room_light: OmniLight3D
 var world: Node3D
 var blocks := 0
 var info: Label
+var shop_overlay: Control
+var overlay_items: Array = []
 
 
 func _ready() -> void:
@@ -127,11 +129,45 @@ func _ready() -> void:
 	# Pedestal where purchases appear.
 	_box(Vector3(-3, 0.4, -3), Vector3(1, 0.8, 1), wall_mat)
 
+	# Universal 2D shop overlay (the projected wall screen is a bonus on
+	# renderers that support viewport-on-material; see task #32 for web).
+	shop_overlay = Control.new()
+	shop_overlay.visible = false
+	shop_overlay.z_index = 20
+	add_child(shop_overlay)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shop_overlay.add_child(dim)
+	var shop_bg := GameUI.panel(Vector2(240, 90), Vector2(620, 480), Color(0.4, 0.85, 0.6))
+	shop_overlay.add_child(shop_bg)
+	shop_overlay.add_child(GameUI.label("RIVETON SUPPLY CO.", 26, Vector2(270, 116),
+			Color(0.5, 0.9, 0.7), true))
+	shop_overlay.add_child(GameUI.label("click a crate to buy   E to close", 14,
+			Vector2(272, 152), Color(1, 1, 1, 0.5)))
+	for i in 4:
+		var item := RiveControl.new()
+		item.file = load("res://fixtures/cards.riv")
+		item.artboard = "shop_item"
+		item.position = Vector2(285 + (i % 2) * 280, 185 + (i / 2) * 190)
+		item.size = Vector2(250, 175)
+		shop_overlay.add_child(item)
+		item.loaded.connect(func():
+			item.set_property("label", "CRATE %d" % (i + 1))
+			item.set_property("price", "%d G" % (25 * (i + 1)))
+			item.set_property("tint", Color.from_hsv(0.08 + i * 0.18, 0.75, 0.9))
+			item.set_property("sold", 1.0), CONNECT_ONE_SHOT)
+		item.gui_input.connect(func(ev):
+			if ev is InputEventMouseButton and ev.pressed:
+				_buy(i))
+		overlay_items.push_back(item)
+
 	var cross := GameUI.label("+", 22, Vector2.ZERO, Color(1, 1, 1, 0.8))
 	cross.set_anchors_preset(Control.PRESET_CENTER)
 	add_child(cross)
-	info = GameUI.label("CLICK to capture mouse   WASD move   click screens   ESC menu",
-			13, Vector2(250, 12), Color(1, 1, 1, 0.55))
+	info = GameUI.label("CLICK captures mouse   WASD move   E near terminal: shop   click switch: lights   ESC menu",
+			13, Vector2(170, 12), Color(1, 1, 1, 0.55))
 	add_child(info)
 
 
@@ -174,6 +210,14 @@ func _box(pos: Vector3, box_size: Vector3, mat: Material) -> MeshInstance3D:
 	return m
 
 
+func _toggle_shop() -> void:
+	shop_overlay.visible = not shop_overlay.visible
+	if shop_overlay.visible:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	else:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
 func _buy(index: int) -> void:
 	blocks += 1
 	var mat := StandardMaterial3D.new()
@@ -181,6 +225,8 @@ func _buy(index: int) -> void:
 	_box(Vector3(-3, 1.0 + blocks * 0.45, -3), Vector3(0.4, 0.4, 0.4), mat)
 	shop_items[index].set_property("sold", 0.3)
 	shop_items[index].set_property("price", "SOLD")
+	overlay_items[index].set_property("sold", 0.3)
+	overlay_items[index].set_property("price", "SOLD")
 
 
 func _screen_uv(mesh: MeshInstance3D, half: Vector2) -> Variant:
@@ -215,6 +261,14 @@ func _interact(phase: int) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and event.keycode == KEY_E:
+		# Shop opens when near/facing the terminal (or from anywhere on a
+		# renderer without projected screens — just be within reach).
+		if shop_overlay.visible or body.distance_to(Vector3(0, 1.6, -4)) < 3.5:
+			_toggle_shop()
+		return
+	if shop_overlay.visible:
+		return
 	if event is InputEventMouseButton and event.pressed:
 		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

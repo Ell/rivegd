@@ -154,24 +154,22 @@ func _ready() -> void:
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	party_panel.add_child(dim)
-	var pp := GameUI.panel(Vector2(190, 80), Vector2(720, 500), Color(0.55, 0.65, 0.95))
+	var pp := GameUI.panel(Vector2(190, 120), Vector2(720, 440), Color(0.55, 0.65, 0.95))
 	party_panel.add_child(pp)
-	party_panel.add_child(GameUI.label("PARTY", 30, Vector2(220, 102), Color.WHITE, true))
-	party_panel.add_child(GameUI.label("bar = HP", 14, Vector2(800, 116), Color(1, 1, 1, 0.5)))
-	var party_grid := RiveControl.new()
-	party_grid.file = load("res://fixtures/cards.riv")
-	party_grid.artboard = "cards"
-	party_grid.position = Vector2(215, 150)
-	party_grid.size = Vector2(670, 400)
-	party_panel.add_child(party_grid)
-	party_grid.loaded.connect(func():
-		for i in PARTY.size():
-			party_grid.list_append("items", "CardVM")
-			party_grid.list_set_property("items", i, "value", PARTY[i][1])
-			party_grid.list_set_property("items", i, "tint", PARTY[i][2]), CONNECT_ONE_SHOT)
+	party_panel.add_child(GameUI.label("PARTY", 30, Vector2(220, 142), Color.WHITE, true))
+	party_panel.add_child(GameUI.label("bar = HP", 14, Vector2(800, 156), Color(1, 1, 1, 0.5)))
 	for i in PARTY.size():
-		party_panel.add_child(GameUI.label(PARTY[i][0], 17,
-				Vector2(248 + (i % 3) * 172, 566 if i >= 3 else 336)))
+		var member := RiveControl.new()
+		member.file = load("res://fixtures/cards.riv")
+		member.artboard = "hud_panel"
+		member.position = Vector2(230 + (i % 2) * 330, 200 + (i / 2) * 160)
+		member.size = Vector2(300, 125)
+		member.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		party_panel.add_child(member)
+		member.loaded.connect(func():
+			member.set_property("title", PARTY[i][0])
+			member.set_property("value", PARTY[i][1])
+			member.set_property("tint", PARTY[i][2]), CONNECT_ONE_SHOT)
 
 
 func _hud_refresh() -> void:

@@ -29,9 +29,14 @@ func _process(_d):
 			get_viewport().get_texture().get_image().save_png(
 				ProjectSettings.globalize_path("res://") + "../out/play_dialogue.png")
 			tap(KEY_E)
-		175: tap(KEY_E)                  # close (2 lines) -> +5 gold
-		195: tap(KEY_P)                  # party screen
-		225:
+		175: tap(KEY_E)                  # complete/advance line 2
+		185: tap(KEY_E)                  # close -> +5 gold
+		200:
+			var jrpg2 = main.current
+			jrpg2.talking = -1
+			jrpg2.dlg_panel.visible = false
+			jrpg2.party_panel.visible = true
+		235:
 			get_viewport().get_texture().get_image().save_png(
 				ProjectSettings.globalize_path("res://") + "../out/play_party.png")
 			get_tree().quit(0)
