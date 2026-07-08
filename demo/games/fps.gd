@@ -264,7 +264,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.keycode == KEY_E:
 		# Shop opens when near/facing the terminal (or from anywhere on a
 		# renderer without projected screens — just be within reach).
-		if shop_overlay.visible or body.distance_to(Vector3(0, 1.6, -4)) < 3.5:
+		if shop_overlay.visible or body.distance_to(Vector3(0, 1.6, -4)) < 4.5:
 			_toggle_shop()
 		return
 	if shop_overlay.visible:
