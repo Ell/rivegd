@@ -21,6 +21,13 @@ Rive playback for Godot 4.7+ as a GDExtension.
 
 ## Install
 
+From a release: download `rivegd-<version>.zip` from
+[GitHub Releases](https://github.com/Ell/rivegd/releases), extract it into
+your project's `addons/` folder, and open the project. Prebuilt binaries
+cover Linux x86_64 (editor + export) and web (wasm32).
+
+From source:
+
 1. Copy `addons/rive/` into your project (or symlink it while developing).
 2. Place the built library at
    `addons/rive/bin/<platform>/librivegd.<platform>.<target>.<arch>.so|dll`

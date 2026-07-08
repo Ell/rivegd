@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang ninja-build scons uuid-dev glslang-tools libvulkan-dev
+      - name: Cache rive stage-1 build
+        uses: actions/cache@v4
+        with:
+          path: thirdparty/rive-runtime/renderer/out
+          key: rive-linux-${{ hashFiles('.gitmodules', 'tools/build_rive.sh') }}-${{ hashFiles('thirdparty/rive-runtime/.git') }}
+      - name: Build rive (stage 1)
+        run: tools/build_rive.sh release
+      - name: Build GDExtension (debug + release)
+        run: |
+          scons -j$(nproc) target=template_debug
+          scons -j$(nproc) target=template_release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-linux
+          path: addons/rive/bin/linux/
+
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang ninja-build scons uuid-dev
+      - name: Cache rive stage-1 wasm build
+        uses: actions/cache@v4
+        with:
+          path: |
+            thirdparty/rive-runtime/renderer/out/wasm_release
+            thirdparty/rive-runtime/build/dependencies/emsdk_4.0.20
+          key: rive-wasm-${{ hashFiles('.gitmodules', 'tools/build_rive_web.sh') }}-${{ hashFiles('thirdparty/rive-runtime/.git') }}
+      - name: Build rive (stage 1, wasm)
+        run: tools/build_rive_web.sh release
+      - name: Build GDExtension (wasm side module)
+        run: |
+          source thirdparty/rive-runtime/build/dependencies/emsdk_4.0.20/emsdk_env.sh
+          scons platform=web target=template_release threads=no -j$(nproc)
+          scons platform=web target=template_debug threads=no -j$(nproc)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-web
+          path: addons/rive/bin/web/
+
+  package:
+    needs: [linux, web]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bin-linux
+          path: addons/rive/bin/linux/
+      - uses: actions/download-artifact@v4
+        with:
+          name: bin-web
+          path: addons/rive/bin/web/
+      - name: Package addon
+        run: |
+          cp LICENSE addons/rive/
+          cd addons && zip -r ../rivegd-${{ github.ref_name }}.zip rive
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            "rivegd-${{ github.ref_name }}.zip" \
+            --title "rivegd ${{ github.ref_name }}" \
+            --generate-notes

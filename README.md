@@ -49,6 +49,13 @@ Compatibility renderer can't render Rive content (Godot creates a GL 3.3
 context; the renderer needs GL 4.2 on desktop) — files still load and state
 machines still run, useful for servers and tests.
 
+## Installing
+
+Grab `rivegd-<version>.zip` from
+[Releases](https://github.com/Ell/rivegd/releases) and extract it into
+your project's `addons/` folder. Prebuilt binaries cover Linux x86_64 and
+web exports; other platforms build from source (below).
+
 ## Building
 
 ```sh
