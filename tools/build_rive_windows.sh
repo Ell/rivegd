@@ -36,6 +36,19 @@ if [ -n "$GCC_POSIX_DIR" ]; then
 fi
 printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 %s -Qunused-arguments -fuse-ld=lld "$@"\n' "$CLANG_BIN" "$GCC_DIR_FLAG" > "$SHIM_DIR/clang"
 printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 %s -Qunused-arguments -fuse-ld=lld "$@"\n' "$CLANGXX_BIN" "$GCC_DIR_FLAG" > "$SHIM_DIR/clang++"
+chmod +x "$SHIM_DIR/clang" "$SHIM_DIR/clang++"
+# Fail fast if clang would compile against win32-model libstdc++ headers
+# (their gthreads land as unresolvable __gthr_win32_* at final link).
+echo "mingw GCC install pin: ${GCC_DIR_FLAG:-<default>}"
+FLAVOR="$(echo '#include <mutex>' | "$SHIM_DIR/clang++" -x c++ - -E 2>/dev/null | grep -m1 -oE '/usr/lib/gcc/x86_64-w64-mingw32/[^/]*' | head -1)"
+echo "libstdc++ headers from: ${FLAVOR:-<system default>}"
+case "$FLAVOR" in
+    *-win32)
+        echo "ERROR: clang resolves the win32-thread-model mingw headers;"
+        echo "install g++-mingw-w64-x86-64-posix (and its runtime)." >&2
+        exit 1
+        ;;
+esac
 cat > "$SHIM_DIR/fxc" <<'EOF'
 #!/usr/bin/env bash
 out=""; prev=""
