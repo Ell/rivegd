@@ -16,6 +16,9 @@ thirdparty/rive-runtime/out/
 .venv/
 __pycache__/
 
+# tool/session artifacts
+.playwright-mcp/
+
 # godot project caches
 .godot/
 *.import
