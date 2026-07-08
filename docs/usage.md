@@ -24,7 +24,7 @@ Rive playback for Godot 4.7+ as a GDExtension.
 From a release: download `rivegd-<version>.zip` from
 [GitHub Releases](https://github.com/Ell/rivegd/releases), extract it into
 your project's `addons/` folder, and open the project. Prebuilt binaries
-cover Linux x86_64 (editor + export) and web (wasm32).
+cover Linux x86_64, Windows x86_64 (editor + export), and web (wasm32).
 
 From source:
 
@@ -421,6 +421,10 @@ cd rivegd
 #          glslang-tools, libvulkan-dev)
 tools/build_rive.sh
 
+# Windows (cross-compiled from Linux with clang + mingw-w64 + lld;
+# Vulkan-only, no D3D — Godot on Windows runs Vulkan for Forward+/Mobile):
+#   tools/build_rive_windows.sh
+#   scons platform=windows use_mingw=yes target=template_release
 # Stage 2: the GDExtension (needs scons; use a venv if not installed)
 python3 -m venv .venv && .venv/bin/pip install scons
 .venv/bin/scons                      # debug; add target=template_release for release

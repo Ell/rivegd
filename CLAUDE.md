@@ -10,11 +10,15 @@ covers how to build, test, and avoid the traps. (Internal planning notes —
 ```sh
 tools/build_rive.sh                # stage 1: rive static libs (Linux desktop)
 tools/build_rive_web.sh            # stage 1 for wasm (installs Emscripten 4.0.20)
+tools/build_rive_windows.sh        # stage 1 for windows (clang+mingw cross, vulkan-only)
 .venv/bin/scons                    # stage 2: the GDExtension (template_debug)
 .venv/bin/scons target=template_release
 # web stage 2 (source the SAME emsdk stage 1 used):
 source thirdparty/rive-runtime/build/dependencies/emsdk_4.0.20/emsdk_env.sh
 .venv/bin/scons platform=web target=template_release threads=no
+# windows stage 2 (needs g++-mingw-w64-x86-64 for the sysroot + lld):
+.venv/bin/scons platform=windows use_mingw=yes target=template_release
+# wine smoke: wine Godot_v4.7-stable_win64_console.exe --path tests/project api_smoke.tscn
 ```
 
 - Stage-1 flags and stage-2 `CPPDEFINES` **must match** (`RIVE_VULKAN`,
@@ -89,6 +93,15 @@ FIFO makes it safe). One refcounted file import per `RiveFileResource`.
   `debug_symbols=yes`; verify imports with node
   `WebAssembly.Module.imports()` vs main-module exports (GL comes from the
   JS library, not wasm exports).
+- Windows cross-build: rive's premake pipeline works with PATH shims that
+  exec `clang --target=x86_64-w64-mingw32 -fuse-ld=lld` (ABSOLUTE compiler
+  path in the shim or it re-execs itself forever), an fxc stub, and a
+  transient `no_d3d` premake patch (reverted post-build) — all inside
+  tools/build_rive_windows.sh. Vulkan headers come from rive's vendored
+  Vulkan-Headers dependency (mingw has none). The DLL loads under Wine;
+  winevulkan runs the full GPU suite.
+- Comments between shell line-continuations silently break them (the env
+  vars just vanish) — build_rive_web.sh shipped broken this way once.
 - GDScript can't call engine virtuals on GDExtension classes
   (`_gui_input()` errors) — use `grab_focus()` + `Viewport.push_input()`.
   GDScript also can't reference INTERNAL-registered classes as types.

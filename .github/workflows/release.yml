@@ -60,8 +60,34 @@ jobs:
           name: bin-web
           path: addons/rive/bin/web/
 
+  windows:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang lld ninja-build scons uuid-dev glslang-tools g++-mingw-w64-x86-64
+      - name: Cache rive stage-1 windows build
+        uses: actions/cache@v4
+        with:
+          path: thirdparty/rive-runtime/renderer/out/windows_release
+          key: rive-windows-${{ hashFiles('.gitmodules', 'tools/build_rive_windows.sh') }}-${{ hashFiles('thirdparty/rive-runtime/.git') }}
+      - name: Build rive (stage 1, mingw cross)
+        run: tools/build_rive_windows.sh release
+      - name: Build GDExtension (debug + release)
+        run: |
+          scons -j$(nproc) platform=windows use_mingw=yes target=template_debug
+          scons -j$(nproc) platform=windows use_mingw=yes target=template_release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-windows
+          path: addons/rive/bin/windows/
+
   package:
-    needs: [linux, web]
+    needs: [linux, web, windows]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -75,6 +101,10 @@ jobs:
         with:
           name: bin-web
           path: addons/rive/bin/web/
+      - uses: actions/download-artifact@v4
+        with:
+          name: bin-windows
+          path: addons/rive/bin/windows/
       - name: Package addon
         run: |
           cp LICENSE addons/rive/

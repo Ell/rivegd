@@ -1,6 +1,8 @@
 #include "godot/rive_render_server.h"
 
+#if defined(RIVE_DESKTOP_GL) || defined(RIVE_WEBGL)
 #include "render/gl/gl_bridge.hpp"
+#endif
 #include "render/render_bridge.hpp"
 #ifdef RIVE_VULKAN
 #include "render/vulkan/vulkan_bridge.hpp"
@@ -420,6 +422,7 @@ bool RiveRenderServer::rt_ensure_bridge() {
         // Compatibility renderer (or headless). GL shares Godot's context;
         // we are on the thread that owns it (render thread).
         const String driver = rs->get_current_rendering_driver_name();
+#if defined(RIVE_DESKTOP_GL) || defined(RIVE_WEBGL)
         if (driver.begins_with("opengl")) {
             std::string error;
             bridge = render::GLBridge::create(&error);
@@ -441,6 +444,10 @@ bool RiveRenderServer::rt_ensure_bridge() {
             ERR_PRINT("rivegd: no RenderingDevice and driver '" + driver +
                       "' is unsupported; Rive runs logic-only.");
         }
+#else
+        ERR_PRINT("rivegd: no RenderingDevice (driver '" + driver +
+                  "'); this build is Vulkan-only — Rive runs logic-only.");
+#endif
         return false;
     }
 #ifdef RIVE_VULKAN

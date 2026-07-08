@@ -1,8 +1,8 @@
 # rivegd
 
 [Rive](https://rive.app) integration for Godot 4.7+, built on Rive's official
-C++ runtime and GPU renderer. Runs on the Vulkan renderers on desktop and on
-WebGL2 in web exports.
+C++ runtime and GPU renderer. Runs on the Vulkan renderers on desktop
+(Linux and Windows) and on WebGL2 in web exports.
 
 ```gdscript
 var file: RiveFileResource = load("res://ui/menu.riv")   # no import step
@@ -44,7 +44,7 @@ $Grid.list_append("items", "CardVM")                     # dynamic lists
 - Web export support (`platform=web` GDExtension side module; works with
   Godot's dlink templates).
 
-Not supported yet: macOS/iOS (Metal), Windows D3D12, Android. The desktop
+Not supported yet: macOS/iOS (Metal), Android. The desktop
 Compatibility renderer can't render Rive content (Godot creates a GL 3.3
 context; the renderer needs GL 4.2 on desktop) — files still load and state
 machines still run, useful for servers and tests.
@@ -53,8 +53,9 @@ machines still run, useful for servers and tests.
 
 Grab `rivegd-<version>.zip` from
 [Releases](https://github.com/Ell/rivegd/releases) and extract it into
-your project's `addons/` folder. Prebuilt binaries cover Linux x86_64 and
-web exports; other platforms build from source (below).
+your project's `addons/` folder. Prebuilt binaries cover Linux x86_64,
+Windows x86_64, and web exports; other platforms build from source
+(below).
 
 ## Building
 

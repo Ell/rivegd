@@ -4,7 +4,19 @@
 #include "rive/renderer/vulkan/render_context_vulkan_impl.hpp"
 #include "rive/renderer/vulkan/render_target_vulkan.hpp"
 
+#ifdef _WIN32
+#include <windows.h>
+#define rivegd_dlopen(name) reinterpret_cast<void*>(LoadLibraryA(name))
+#define rivegd_dlsym(lib, sym) \
+    reinterpret_cast<void*>( \
+        GetProcAddress(reinterpret_cast<HMODULE>(lib), sym))
+#define rivegd_dlclose(lib) FreeLibrary(reinterpret_cast<HMODULE>(lib))
+#else
 #include <dlfcn.h>
+#define rivegd_dlopen(name) dlopen(name, RTLD_NOW | RTLD_LOCAL)
+#define rivegd_dlsym(lib, sym) dlsym(lib, sym)
+#define rivegd_dlclose(lib) dlclose(lib)
+#endif
 
 namespace rivegd::render {
 
@@ -33,15 +45,21 @@ bool VulkanBridge::init(const GodotVulkanHandles& handles,
                     "RenderingDevice-based rendering method?)");
     }
 
-    m_vulkan_lib = dlopen("libvulkan.so.1", RTLD_NOW | RTLD_LOCAL);
+#ifdef _WIN32
+    m_vulkan_lib = rivegd_dlopen("vulkan-1.dll");
+#else
+    m_vulkan_lib = rivegd_dlopen("libvulkan.so.1");
+#endif
     if (m_vulkan_lib == nullptr) {
-        m_vulkan_lib = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
+#ifndef _WIN32
+        m_vulkan_lib = rivegd_dlopen("libvulkan.so");
+#endif
     }
     if (m_vulkan_lib == nullptr) {
         return fail("could not dlopen libvulkan");
     }
     m_get_instance_proc = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
-        dlsym(m_vulkan_lib, "vkGetInstanceProcAddr"));
+        rivegd_dlsym(m_vulkan_lib, "vkGetInstanceProcAddr"));
     if (m_get_instance_proc == nullptr) {
         return fail("libvulkan has no vkGetInstanceProcAddr");
     }
@@ -161,7 +179,7 @@ VulkanBridge::~VulkanBridge() {
         m_fns.DestroyCommandPool(m_device, m_command_pool, nullptr);
     }
     if (m_vulkan_lib != nullptr) {
-        dlclose(m_vulkan_lib);
+        rivegd_dlclose(m_vulkan_lib);
     }
 }
 

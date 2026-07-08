@@ -12,8 +12,15 @@ import os
 env = SConscript("thirdparty/godot-cpp/SConstruct")
 
 env.Append(CPPPATH=["src", "thirdparty/rive-runtime/include"])
+if env["platform"] == "windows":
+    # MinGW has no Vulkan headers; use the set rive's stage 1 vendored.
+    env.Append(CPPPATH=[
+        "thirdparty/rive-runtime/renderer/dependencies/"
+        "KhronosGroup_Vulkan-Headers_vulkan-sdk-1.4.321/include"
+    ])
 
 is_web = env["platform"] == "web"
+is_windows = env["platform"] == "windows"
 
 # Stage-1 output. build_rive.sh puts release builds in out/release and
 # wasm builds in out/wasm_release (tools/build_rive_web.sh).
@@ -21,6 +28,8 @@ rive_out = ARGUMENTS.get(
     "rive_out",
     "thirdparty/rive-runtime/renderer/out/wasm_release"
     if is_web
+    else "thirdparty/rive-runtime/renderer/out/windows_release"
+    if is_windows
     else "thirdparty/rive-runtime/renderer/out/release",
 )
 if not os.path.isdir(rive_out):
@@ -40,7 +49,13 @@ env.Append(
 # the glad desktop-GL loader (RIVE_VULKAN + RIVE_DESKTOP_GL); web is
 # WebGL2 (RIVE_WEBGL — rive's premake sets it for system:emscripten).
 env.Append(
-    CPPDEFINES=(["RIVE_WEBGL"] if is_web else ["RIVE_VULKAN", "RIVE_DESKTOP_GL"])
+    CPPDEFINES=(
+        ["RIVE_WEBGL"]
+        if is_web
+        else ["RIVE_VULKAN"]  # windows: no GL (glad loader is posix-only)
+        if is_windows
+        else ["RIVE_VULKAN", "RIVE_DESKTOP_GL"]
+    )
     + [
         # External audio engine (must match stage 1's
         # --with_rive_audio=external).
@@ -59,7 +74,7 @@ env.Append(
 # librive and librive_pls_renderer reference each other (scripting's GPU
 # canvas hooks) — group-link so ld rescans the archives.
 rive_libs = " ".join(
-    os.path.join(rive_out, "lib%s.a" % name)
+    os.path.join(rive_out, ("%s.lib" if is_windows else "lib%s.a") % name)
     for name in [
         "rive_pls_renderer", "rive_decoders", "rive", "rive_harfbuzz",
         "rive_sheenbidi", "rive_yoga", "miniaudio", "luau_vm",
@@ -88,11 +103,12 @@ if env["target"] in ["editor", "template_debug"]:
         "src/gen/doc_data.gen.cpp", source=Glob("doc_classes/*.xml")
     )
 
-# Web has no Vulkan; the Vulkan bridge only compiles for desktop.
+# Web has no Vulkan; windows is Vulkan-only (no GL bridge).
 render_sources = [
     f
     for f in Glob("src/render/*/*.cpp")
     if not (is_web and "vulkan" in str(f))
+    and not (is_windows and os.sep + "gl" + os.sep in str(f))
 ]
 
 sources = (
