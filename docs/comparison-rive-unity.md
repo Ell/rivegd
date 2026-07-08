@@ -46,7 +46,7 @@ runtime + Rive Renderer.
 | Out-of-band assets (referenced images/fonts/audio) | ✅ shipped | ✅ shipped (sibling-file convention, queue global registry; smoke-verified) |
 | Listener-aware hit testing (`Translucent`) | ✅ per-widget Hit Test Behavior | ✅ `hit_test_behavior` on RiveControl (sync `hitTest` guarded by the flush mutex; smoke-verified) |
 | Multitouch | ✅ | ✅ per-finger pointer ids (touch index → rive pointerId; smoke-verified) |
-| **Panel compositor** (many widgets → ONE render texture) | ✅ RivePanel | one texture per instance (GPU work batched, but N textures) |
+| Panel compositor (many widgets → ONE render texture) | ✅ RivePanel | one texture per instance — but measured: 500 continuously-animating 128px cards render at 13ms avg after the single-pump fix (was 32ms/134ms-spikes); compositor deferred until a real workload beats that |
 | **Procedural rendering** (drive Rive Renderer from C#: paths/paints/blends) | ✅ | not exposed to GDScript |
 | DPI scaling modes | ✅ three presets | ✅ `layout_scale` factor (presets are one-line GDScript recipes, documented) |
 | Per-widget audio routing / mixer groups | ✅ per-widget AudioProvider | ✅ `audio_bus` per node (dedicated engine + internal player; smoke-verified) |

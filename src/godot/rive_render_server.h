@@ -227,6 +227,9 @@ private:
     godot::HashMap<int64_t, Instance*> instances; // render thread only
     bool bridge_failed = false;                   // render thread only
     bool frame_hook_connected = false;            // main thread only
+    // True when frame_pre_draw actually fires (not headless): pumps defer
+    // to one flush per drawn frame. Main thread only.
+    bool pump_deferred = false;
 
     std::mutex mailbox_mutex;
     // Serializes the render-thread pump (rt_flush_all: every rive mutation

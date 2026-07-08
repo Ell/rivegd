@@ -174,9 +174,28 @@ void RiveRenderServer::free_singleton() {
     }
 }
 
-void RiveRenderServer::on_frame_pre_draw() { request_pump(); }
+void RiveRenderServer::on_frame_pre_draw() {
+    // One flush per rendered frame: every runOnce posted since the last
+    // draw (all instances' rt_frame, inputs, writes) lands in a single
+    // pump, so the render loop sees ALL dirty instances at once and the
+    // chunked submit stays within the fence ring. (Scheduling a flush per
+    // mutation made flush count scale with instance count: 200 animated
+    // instances = ~200 single-render submissions/frame, bimodal fence
+    // stalls, 134ms spikes.)
+    if (pump_pending.load()) {
+        RenderingServer::get_singleton()->call_on_render_thread(
+            callable_mp(this, &RiveRenderServer::rt_flush_all));
+    }
+}
 
 void RiveRenderServer::request_pump() {
+    if (pump_deferred) {
+        // Rendering: mark and wait for frame_pre_draw to run the single
+        // per-frame flush.
+        pump_pending.store(true);
+        return;
+    }
+    // Headless (frame_pre_draw never fires): pump immediately, deduped.
     bool expected = false;
     if (pump_pending.compare_exchange_strong(expected, true)) {
         RenderingServer::get_singleton()->call_on_render_thread(
@@ -198,6 +217,12 @@ void RiveRenderServer::_bind_methods() {
 void RiveRenderServer::ensure_frame_hook() {
     if (!frame_hook_connected) {
         frame_hook_connected = true;
+        // Deferring pumps to frame_pre_draw only works when draws happen:
+        // under --headless the signal is connected but NEVER fires, so
+        // request_pump must keep the immediate path there.
+        pump_deferred =
+            DisplayServer::get_singleton() != nullptr &&
+            DisplayServer::get_singleton()->get_name() != "headless";
         RenderingServer::get_singleton()->connect(
             "frame_pre_draw",
             callable_mp(this, &RiveRenderServer::on_frame_pre_draw));
@@ -709,12 +734,27 @@ void RiveRenderServer::rt_flush_all() {
     // Submitting in chunks keeps the GPU fed while the CPU records the
     // next chunk (a single giant batch measurably regresses frame time on
     // fast GPUs; per-instance submits waste submissions on slow ones).
-    static int chunk_size = [] {
+    // The chunk size ADAPTS to the dirty count: total submissions must fit
+    // the bridge's fence ring (16 slots) or the CPU stalls on fences.
+    // Measured at 500 animated 128px artboards: K=4 -> 32.2ms avg with
+    // 134ms p95 fence-thrash spikes; K=32 -> 21.1ms with p95 22ms.
+    static int forced_chunk_size = [] {
         const String env = OS::get_singleton()->get_environment(
             "RIVEGD_BATCH_SIZE");
         const int parsed = env.to_int();
-        return parsed > 0 ? parsed : 4;
+        return parsed > 0 ? parsed : 0;
     }();
+    int dirty = 0;
+    for (const KeyValue<int64_t, Instance*>& entry : instances) {
+        if (entry.value->valid && entry.value->needs_render &&
+            entry.value->target != nullptr) {
+            dirty++;
+        }
+    }
+    const int chunk_size =
+        forced_chunk_size > 0
+            ? forced_chunk_size
+            : CLAMP((dirty + 14) / 15, 4, 64); // <=15 submissions + slack
 
     std::string error;
     int in_chunk = 0;
