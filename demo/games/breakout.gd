@@ -35,21 +35,19 @@ func _ready() -> void:
 			Color(0.05, 0.06, 0.09, 0.85))
 	add_child(field)
 
-	# Top HUD strip: rive progress card + score + rive lives list.
-	var strip := GameUI.panel(Vector2(60, 10), Vector2(980, 78))
-	add_child(strip)
+	# Top HUD: rive hud_panel + rive lives list, straight on the backdrop.
 	hud_score = RiveControl.new()
 	hud_score.file = load("res://fixtures/cards.riv")
 	hud_score.artboard = "hud_panel"
-	hud_score.position = Vector2(72, 6)
-	hud_score.size = Vector2(210, 86)
+	hud_score.position = Vector2(70, 4)
+	hud_score.size = Vector2(220, 90)
 	hud_score.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(hud_score)
 	hud_score.loaded.connect(func():
 		hud_score.set_property("title", "SCORE 0")
 		hud_score.set_property("tint", Color(0.95, 0.6, 0.15))
 		hud_score.set_property("value", 0.0), CONNECT_ONE_SHOT)
-	add_child(GameUI.label("LIVES", 14, Vector2(806, 34), Color(1, 1, 1, 0.6)))
+	add_child(GameUI.label("LIVES", 14, Vector2(800, 40), Color(1, 1, 1, 0.6)))
 	hud_lives = RiveControl.new()
 	hud_lives.file = load("res://fixtures/cards.riv")
 	hud_lives.artboard = "cards"

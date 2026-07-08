@@ -411,6 +411,25 @@ void RiveInstance::list_clear(const String& p_path) {
 void RiveInstance::list_set_property(const String& p_path, int p_index,
                                      const String& p_sub_path,
                                      const Variant& p_value) {
+    if (p_value.get_type() == Variant::OBJECT) {
+        // Image properties on list items: static decode path (icons,
+        // portraits). Encode main-side; the render thread decodes once.
+        Ref<Image> image = p_value;
+        if (image.is_null()) {
+            Ref<Texture2D> texture = p_value;
+            if (texture.is_valid()) {
+                image = texture->get_image();
+            }
+        }
+        if (image.is_null()) {
+            ERR_PRINT("rivegd: expected an Image or Texture2D for list item '" +
+                      p_sub_path + "'");
+            return;
+        }
+        RIVEGD_POST(rt_list_set_image, p_path, p_index, p_sub_path,
+                    image->save_png_to_buffer());
+        return;
+    }
     RIVEGD_POST(rt_list_set, p_path, p_index, p_sub_path, p_value);
 }
 

@@ -154,22 +154,91 @@ func _ready() -> void:
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	party_panel.add_child(dim)
-	var pp := GameUI.panel(Vector2(190, 120), Vector2(720, 440), Color(0.55, 0.65, 0.95))
+	var pp := GameUI.panel(Vector2(130, 90), Vector2(840, 500), Color(0.55, 0.65, 0.95))
 	party_panel.add_child(pp)
-	party_panel.add_child(GameUI.label("PARTY", 30, Vector2(220, 142), Color.WHITE, true))
-	party_panel.add_child(GameUI.label("bar = HP", 14, Vector2(800, 156), Color(1, 1, 1, 0.5)))
+	party_panel.add_child(GameUI.label("PARTY", 26, Vector2(165, 112), Color.WHITE, true))
+	party_panel.add_child(GameUI.label("INVENTORY", 26, Vector2(560, 112), Color.WHITE, true))
+	party_panel.add_child(GameUI.label("drag to scroll", 13, Vector2(560, 146), Color(1, 1, 1, 0.45)))
 	for i in PARTY.size():
 		var member := RiveControl.new()
 		member.file = load("res://fixtures/cards.riv")
 		member.artboard = "hud_panel"
-		member.position = Vector2(230 + (i % 2) * 330, 200 + (i / 2) * 160)
-		member.size = Vector2(300, 125)
+		member.position = Vector2(160, 165 + i * 100)
+		member.size = Vector2(300, 90)
 		member.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		party_panel.add_child(member)
 		member.loaded.connect(func():
 			member.set_property("title", PARTY[i][0])
 			member.set_property("value", PARTY[i][1])
-			member.set_property("tint", PARTY[i][2]), CONNECT_ONE_SHOT)
+			member.set_property("tint", PARTY[i][2])
+			# Plain Image -> static decode path (adopted GPU textures
+			# currently mishandle transparency; see task #33).
+			member.set_property("face", _face_image(i)), CONNECT_ONE_SHOT)
+	var inv := RiveControl.new()
+	inv.file = load("res://fixtures/cards.riv")
+	inv.artboard = "inventory"
+	inv.position = Vector2(550, 165)
+	inv.size = Vector2(390, 400)
+	party_panel.add_child(inv)
+	inv.loaded.connect(func():
+		var objects: Texture2D = load("res://games/assets/objects.png")
+		# [name, qty, tint, icon cell in objects.png (16px grid)]
+		var items := [["Potion", "x3", Color(0.4, 0.8, 0.5), Vector2(13, 0)],
+				["Hi-Potion", "x1", Color(0.3, 0.7, 0.9), Vector2(14, 0)],
+				["Antidote", "x2", Color(0.7, 0.5, 0.9), Vector2(3, 1)],
+				["Bronze Key", "x1", Color(0.85, 0.7, 0.35), Vector2(0, 4)],
+				["Herb", "x7", Color(0.5, 0.8, 0.4), Vector2(2, 0)],
+				["Ether", "x2", Color(0.55, 0.55, 0.95), Vector2(9, 3)],
+				["Tent", "x1", Color(0.85, 0.55, 0.4), Vector2(9, 0)],
+				["Riveton Pass", "x1", Color(0.5, 0.9, 0.7), Vector2(16, 0)],
+				["Old Coin", "x12", Color(0.8, 0.75, 0.5), Vector2(0, 5)],
+				["Map Fragment", "x4", Color(0.6, 0.6, 0.65), Vector2(18, 0)]]
+		# Fill the pack out so the list genuinely scrolls.
+		var adjectives := ["Iron", "Silver", "Oak", "Crystal", "Moss", "Sun",
+				"River", "Old", "Fine", "Cursed"]
+		var kinds := ["Sword", "Shield", "Ring", "Amulet", "Scroll",
+				"Tonic", "Loaf", "Gem", "Charm", "Bolt"]
+		var icon_cells := [Vector2(13, 0), Vector2(14, 0), Vector2(2, 0),
+				Vector2(9, 0), Vector2(16, 0), Vector2(17, 0), Vector2(18, 0),
+				Vector2(0, 4), Vector2(0, 5), Vector2(3, 5), Vector2(4, 3),
+				Vector2(4, 0), Vector2(20, 0), Vector2(2, 5)]
+		for a in adjectives.size():
+			for b in range(0, 5):
+				items.push_back(["%s %s" % [adjectives[a], kinds[(a + b) % kinds.size()]],
+						"x%d" % ((a * 7 + b * 3) % 9 + 1),
+						Color.from_hsv(fmod(0.07 * (a * 5 + b), 1.0), 0.6, 0.85),
+						icon_cells[(a * 3 + b) % icon_cells.size()]])
+		for k in items.size():
+			inv.list_append("rows", "InvRowVM")
+			inv.list_set_property("rows", k, "name", items[k][0])
+			inv.list_set_property("rows", k, "qty", items[k][1])
+			inv.list_set_property("rows", k, "tint", items[k][2])
+			# Godot texture -> rive image property, per list item.
+			var icon := _sub(objects, Rect2(items[k][3] * 16.0, Vector2(16, 16))).get_image()
+			icon.resize(32, 32, Image.INTERPOLATE_NEAREST)
+			inv.list_set_property("rows", k, "icon",
+					ImageTexture.create_from_image(icon)), CONNECT_ONE_SHOT)
+
+
+func _face_image(member_index: int) -> Image:
+	# The WHOLE character sprite (16x32), doubled to 32x64 and centered
+	# in a transparent 64x64 square — rive Image elements render bound
+	# images at natural size, so a fixed square keeps every member
+	# aligned identically in the slot.
+	var body: Image
+	if member_index == 0:
+		body = _sub(sheet, Rect2(0, 0, 16, 32)).get_image()
+	else:
+		body = _sub(npc_sheet, Rect2((member_index - 1) * 16, 0, 16, 32)).get_image()
+		var tint: Color = PARTY[member_index][2].lightened(0.55)
+		for px in body.get_width():
+			for py in body.get_height():
+				var p := body.get_pixel(px, py)
+				body.set_pixel(px, py, Color(p.r * tint.r, p.g * tint.g, p.b * tint.b, p.a))
+	body.resize(32, 64, Image.INTERPOLATE_NEAREST)
+	var square := Image.create_empty(64, 64, false, Image.FORMAT_RGBA8)
+	square.blit_rect(body, Rect2i(0, 0, 32, 64), Vector2i(16, 0))
+	return square
 
 
 func _hud_refresh() -> void:
@@ -183,7 +252,7 @@ func _update_player_sprite() -> void:
 	match facing:
 		1: row = 2
 		2, 3: row = 3
-	player.flip_h = facing == 2
+	player.flip_h = facing == 3
 	player.texture = _sub(sheet, Rect2(walk_frame * 16, row * 32, 16, 32))
 	player.position = player_pos + Vector2(-24, -84)
 
@@ -270,11 +339,5 @@ func _unhandled_key_input(event: InputEvent) -> void:
 						0.0, 1.0, 0.18)
 				dialogue_box.set_property("speaker", NPCS[i]["name"])
 				dialogue_box.set_property("line", "")
-				# Portrait: the villager's head, tinted to match.
-				var face := _sub(npc_sheet, Rect2(i * 16 + 1, 2, 14, 13)).get_image()
-				var tint: Color = NPCS[i]["tint"].lightened(0.55)
-				for px in face.get_width():
-					for py in face.get_height():
-						var p := face.get_pixel(px, py)
-						face.set_pixel(px, py, Color(p.r * tint.r, p.g * tint.g, p.b * tint.b, p.a))
-				portrait_rect.texture = ImageTexture.create_from_image(face)
+				# Portrait: the villager's full sprite, tinted to match.
+				portrait_rect.texture = ImageTexture.create_from_image(_face_image(i + 1))

@@ -142,6 +142,9 @@ public:
     // Live GPU binding: wraps the RD texture behind an RS texture RID as
     // a rive image sampled in place — shader/viewport contents update
     // live, no copies. Vulkan only; falls back with an error elsewhere.
+    void rt_list_set_image(int64_t p_instance_id, const godot::String& p_path,
+                           int p_index, const godot::String& p_sub_path,
+                           const godot::PackedByteArray& p_png_bytes);
     void rt_set_vm_image_live(int64_t p_instance_id,
                               const godot::String& p_path,
                               const godot::RID& p_rs_texture,

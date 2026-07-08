@@ -1627,6 +1627,38 @@ void RiveRenderServer::rt_list_set(int64_t p_instance_id, const String& p_path,
     set_vm_value(item.get(), p_sub_path, p_value);
 }
 
+void RiveRenderServer::rt_list_set_image(int64_t p_instance_id,
+                                         const String& p_path, int p_index,
+                                         const String& p_sub_path,
+                                         const PackedByteArray& p_png_bytes) {
+    Instance** found = instances.getptr(p_instance_id);
+    if (found == nullptr || bridge == nullptr) {
+        return;
+    }
+    Instance* instance = *found;
+    auto* list = resolve_list(this, instance->view_model.get(), p_path);
+    if (list == nullptr || p_index < 0 || size_t(p_index) >= list->size()) {
+        return;
+    }
+    rive::rcp<rive::ViewModelInstanceRuntime> item = list->instanceAt(p_index);
+    auto* property = item->propertyImage(p_sub_path.utf8().get_data());
+    if (property == nullptr) {
+        ERR_PRINT("rivegd: list item image property not found: " + p_sub_path);
+        return;
+    }
+    rive::rcp<rive::RenderImage> image = bridge->factory()->decodeImage(
+        rive::Span<const uint8_t>(p_png_bytes.ptr(), p_png_bytes.size()));
+    if (image == nullptr) {
+        ERR_PRINT("rivegd: could not decode list item image '" + p_sub_path + "'");
+        return;
+    }
+    property->value(image.get());
+    instance->bound_images[vformat("%s/%d/%s", p_path, p_index, p_sub_path)] =
+        image;
+    instance->settled = false;
+    instance->needs_render = true;
+}
+
 
 static const char* semantic_label(const rive::SemanticsDiffNode& node) {
     return node.label.c_str();

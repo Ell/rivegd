@@ -4,6 +4,7 @@
 #include "godot/rive_render_server.h"
 
 #include <godot_cpp/classes/input_event_key.hpp>
+#include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/classes/input_event_mouse_button.hpp>
 #include <godot_cpp/classes/input_event_mouse_motion.hpp>
 #include <godot_cpp/classes/input_event_screen_drag.hpp>
@@ -487,7 +488,22 @@ Vector2 RiveControl::_get_minimum_size() const {
 
 Vector2i RiveControl::texture_size() const {
     const Vector2 control_size = get_size();
-    return Vector2i(MAX(8, int(control_size.x)), MAX(8, int(control_size.y)));
+    // Render at the FINAL on-screen resolution: under stretch modes or
+    // canvas scaling the control's logical size differs from its screen
+    // pixels, and vectors rendered at logical size then upscaled come out
+    // pixelated. get_screen_transform() includes the window's stretch.
+    // Quantized to 1/8 steps so window drags don't churn texture swaps
+    // (the swap itself is debounced state-preserving).
+    const Vector2 screen_scale =
+        (get_viewport() != nullptr
+             ? (get_viewport()->get_final_transform() *
+                get_global_transform_with_canvas())
+                   .get_scale()
+             : Vector2(1, 1));
+    float oversample = MAX(Math::abs(screen_scale.x), Math::abs(screen_scale.y));
+    oversample = CLAMP(Math::snapped(oversample, 0.125f), 0.25f, 4.0f);
+    return Vector2i(MAX(8, int(control_size.x * oversample)),
+                    MAX(8, int(control_size.y * oversample)));
 }
 
 void RiveControl::recreate_instance() {
@@ -661,6 +677,11 @@ void RiveControl::_notification(int p_what) {
                     rive.resize_texture(live_texture_size);
                     break;
                 }
+            } else if (texture_size() != live_texture_size) {
+                // Window stretch/scale changed without a control resize
+                // (no NOTIFICATION_RESIZED fires for that) — debounce a
+                // swap at the new on-screen resolution.
+                resize_cooldown = kResizeDebounceSeconds;
             }
             if (pause_when_hidden && !is_visible_in_tree()) {
                 break; // GOALS G4.6: hidden instances stop advancing
