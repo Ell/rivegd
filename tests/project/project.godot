@@ -11,5 +11,5 @@ config_version=5
 [application]
 
 config/name="rivegd tests"
-config/features=PackedStringArray("4.7")
 run/main_scene="res://web_smoke.tscn"
+config/features=PackedStringArray("4.7")

@@ -124,6 +124,72 @@
 				Writes a scalar property on the list item at [param index].
 			</description>
 		</method>
+		<method name="on_event">
+			<return type="Callable" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="callable" type="Callable" />
+			<description>
+				Calls [param callable]([code]properties: Dictionary[/code]) whenever the Rive event [param name] fires. Returns the connected wrapper — pass it to [code]disconnect("rive_event", wrapper)[/code] to unsubscribe.
+			</description>
+		</method>
+		<method name="on_property">
+			<return type="Callable" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="callable" type="Callable" />
+			<description>
+				Watches [param path] and calls [param callable]([code]value[/code]) on every change (the path is auto-watched). Returns the connected wrapper for [code]disconnect("property_changed", wrapper)[/code].
+			</description>
+		</method>
+		<method name="list_read_property">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="index" type="int" />
+			<param index="2" name="sub_path" type="String" />
+			<description>
+				Asynchronously reads a list item's scalar: the value arrives via [signal property_changed] at the synthetic path [code]"path[index]/sub_path"[/code] and is cached for [method get_property].
+			</description>
+		</method>
+		<method name="send_pointer_event">
+			<return type="void" />
+			<param index="0" name="phase" type="int" />
+			<param index="1" name="position" type="Vector2" />
+			<param index="2" name="pointer_id" type="int" default="0" />
+			<description>
+				Injects a pointer event in control-local coordinates (same path as [method Control._gui_input]). Phases: [code]0[/code] move, [code]1[/code] down, [code]2[/code] up, [code]3[/code] exit. [param pointer_id] enables multitouch (one id per finger).
+			</description>
+		</method>
+		<method name="focus_next_element">
+			<return type="void" />
+			<description>
+				Moves Rive's internal keyboard focus to the next focusable element (shows the focus ring).
+			</description>
+		</method>
+		<method name="focus_previous_element">
+			<return type="void" />
+			<description>
+				Moves Rive's internal keyboard focus to the previous focusable element.
+			</description>
+		</method>
+		<method name="send_text_input">
+			<return type="void" />
+			<param index="0" name="text" type="String" />
+			<description>
+				Sends text to the focused Rive element (text fields). Printable keys arriving through [method Control._gui_input] are forwarded automatically.
+			</description>
+		</method>
+		<method name="submit_gamepad_batch">
+			<return type="void" />
+			<param index="0" name="batch" type="PackedByteArray" />
+			<description>
+				Power-user/testing entry: submits a raw Rive gamepad wire-v2 batch. Normal use is [member gamepad_enabled], which encodes Godot's gamepad state automatically each frame.
+			</description>
+		</method>
+		<method name="get_semantics_node_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Number of semantic (accessibility) nodes currently mirrored from the artboard. Useful for tests; requires [member accessibility_enabled].
+			</description>
+		</method>
 	</methods>
 	<members>
 		<member name="file" type="RiveFileResource" setter="set_file" getter="get_file">
@@ -143,6 +209,27 @@
 		</member>
 		<member name="speed_scale" type="float" setter="set_speed_scale" getter="get_speed_scale" default="1.0">
 			Playback speed multiplier (also affected by [member Engine.time_scale]).
+		</member>
+		<member name="fit" type="int" setter="set_fit" getter="get_fit" default="0">
+			How the artboard maps to the texture: [code]0[/code] Contain (default), [code]1[/code] Cover, [code]2[/code] Fill, [code]3[/code] Fit Width, [code]4[/code] Fit Height, [code]5[/code] None, [code]6[/code] Scale Down, [code]7[/code] Layout. [b]Layout[/b] resizes the artboard itself so its Rive layout (Yoga) reflows to the node's size — use it for responsive UI. Pointer input and hit testing stay accurate in every mode.
+		</member>
+		<member name="alignment" type="int" setter="set_alignment" getter="get_alignment" default="4">
+			Anchor for fit modes that do not fill exactly, as a 9-grid index (0 = top-left … 4 = center … 8 = bottom-right).
+		</member>
+		<member name="layout_scale" type="float" setter="set_layout_scale" getter="get_layout_scale" default="1.0">
+			Content scale for [code]fit = Layout[/code]: the artboard is laid out at [code]size / layout_scale[/code] and drawn scaled up. Constant physical size: set to [code]DisplayServer.screen_get_dpi() / reference_dpi[/code].
+		</member>
+		<member name="audio_bus" type="String" setter="set_audio_bus" getter="get_audio_bus" default="&quot;&quot;">
+			When non-empty, this node's Rive audio plays through a dedicated engine into an internal [AudioStreamPlayer] on the named bus. Empty (default) mixes into the shared global [RiveAudioStream].
+		</member>
+		<member name="gamepad_enabled" type="bool" setter="set_gamepad_enabled" getter="get_gamepad_enabled" default="false">
+			When enabled, Godot gamepad state is diffed and forwarded to Rive every frame (W3C-standard mapping), driving Rive's gamepad listeners and focus navigation.
+		</member>
+		<member name="hit_test_behavior" type="int" setter="set_hit_test_behavior" getter="get_hit_test_behavior" default="0">
+			[code]0[/code] Opaque (default): the whole rect captures pointer events. [code]1[/code] Translucent: only points over an interactive Rive listener capture — clicks over empty or decorative regions fall through to controls behind (listener-aware, not alpha-based: invisible hit areas still capture).
+		</member>
+		<member name="accessibility_enabled" type="bool" setter="set_accessibility_enabled" getter="get_accessibility_enabled" default="false">
+			Mirrors the artboard's authored semantic tree (roles, labels, bounds) into Godot's accessibility system (AccessKit) as sub-elements of this control, making Rive UI visible to screen readers. Elements publish while assistive technology is active.
 		</member>
 	</members>
 	<signals>
@@ -164,6 +251,11 @@
 			<param index="1" name="value" type="Variant" />
 			<description>
 				A watched view-model property changed (see [method watch_property]).
+			</description>
+		</signal>
+		<signal name="loaded">
+			<description>
+				Emitted when the (asynchronously created) Rive instance becomes live — property reads and pointer input are meaningful from here. Property writes made earlier are cached and replayed automatically. Re-fires after every recreate (file/artboard/fit changes).
 			</description>
 		</signal>
 	</signals>

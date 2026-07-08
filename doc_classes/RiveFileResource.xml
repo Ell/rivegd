@@ -65,5 +65,24 @@
 				Authored artboard size in Rive units.
 			</description>
 		</method>
+		<method name="get_asset_descriptions" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Assets the file references, embedded or not: an [Array] of [Dictionary] with [code]name[/code], [code]unique_name[/code], [code]unique_filename[/code], [code]type[/code] ("image"/"font"/"audio"/"other"), and [code]resolved[/code]. Unresolved entries are out-of-band: place the asset next to the [code].riv[/code] using Rive's export naming ([code]name-id.ext[/code]) and it resolves automatically.
+			</description>
+		</method>
+		<method name="add_fallback_font" qualifiers="static">
+			<return type="bool" />
+			<param index="0" name="font" type="Variant" />
+			<description>
+				Registers a global fallback font (a [FontFile] or raw TTF/OTF [PackedByteArray]) consulted, in registration order, whenever an authored font is missing a glyph (CJK, localization, symbols). Returns [code]false[/code] if the data fails to decode. Register before loading text-bearing scenes.
+			</description>
+		</method>
+		<method name="clear_fallback_fonts" qualifiers="static">
+			<return type="void" />
+			<description>
+				Clears all registered fallback fonts.
+			</description>
+		</method>
 	</methods>
 </class>

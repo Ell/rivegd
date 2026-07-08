@@ -1,6 +1,17 @@
 # Rive ⇄ Godot — User Experience Design
 
-Companion to `implementation-strategy.md`. This describes what using the integration feels like for a Godot developer, designer, or technical artist. Guiding principle: **Rive content should feel like a native Godot citizen** — signals, the inspector, Callables, pause/time-scale semantics, and focus should all behave the way a Godot user already expects, with zero boilerplate for the common cases.
+Companion to `implementation-strategy.md`.
+
+> **Status (July 2026):** this design is now substantially SHIPPED —
+> drag-drop instantiation, inspector dropdowns/previews/thumbnails, inputs
+> and data binding as real properties, signals + targeted callables
+> (`on_event`/`on_property`), the `loaded` signal, pause/speed semantics,
+> per-node audio buses, fit modes incl. Layout reflow, and Luau scripting
+> (verified). Known deltas: awaiters are plain `await node.rive_event`
+> (no bespoke helper); `animation_finished`/`input_changed` are not
+> distinct signals; editor "Preview playback" toggle is the inspector
+> preview rather than an in-viewport toggle. See README's feature table
+> for the live status. This describes what using the integration feels like for a Godot developer, designer, or technical artist. Guiding principle: **Rive content should feel like a native Godot citizen** — signals, the inspector, Callables, pause/time-scale semantics, and focus should all behave the way a Godot user already expects, with zero boilerplate for the common cases.
 
 ---
 

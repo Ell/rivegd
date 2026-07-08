@@ -5,3 +5,20 @@
 [     784ms] [LOG] Rive: Command Server Scripting Enabled. @ http://127.0.0.1:8971/index.js:451
 [    1919ms] [LOG] WEB SMOKE: rendering (3 distinct colors) @ http://127.0.0.1:8971/index.js:451
 [    2946ms] [LOG] WEB SMOKE OK: load + render + data binding on web @ http://127.0.0.1:8971/index.js:451
+[  678708ms] [LOG] Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org @ http://127.0.0.1:8971/index.js:451
+[  678804ms] [LOG] OpenGL API OpenGL ES 3.0 (WebGL 2.0 (OpenGL ES 3.0 Chromium)) - Compatibility - Using Device: WebKit - WebKit WebGL @ http://127.0.0.1:8971/index.js:451
+[  678858ms] [LOG] Build configuration: Emscripten 4.0.20, single-threaded, GDExtension support. @ http://127.0.0.1:8971/index.js:451
+[  678886ms] [LOG] WEB SMOKE: file loaded, artboards=["fixtures", "responsive", "textbed", "card", "cards"] @ http://127.0.0.1:8971/index.js:451
+[  678894ms] [LOG] Rive: Command Server Scripting Enabled. @ http://127.0.0.1:8971/index.js:451
+[  679253ms] [LOG] WEB SMOKE: rendering (3 distinct colors) @ http://127.0.0.1:8971/index.js:451
+[  679603ms] [LOG] WEB SMOKE OK: load + render + data binding on web @ http://127.0.0.1:8971/index.js:451
+[  681035ms] [LOG] Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org @ http://127.0.0.1:8971/index.js:451
+[  681152ms] [LOG] OpenGL API OpenGL ES 3.0 (WebGL 2.0 (OpenGL ES 3.0 Chromium)) - Compatibility - Using Device: WebKit - WebKit WebGL @ http://127.0.0.1:8971/index.js:451
+[  681211ms] [LOG] Build configuration: Emscripten 4.0.20, single-threaded, GDExtension support. @ http://127.0.0.1:8971/index.js:451
+[  681246ms] [LOG] WEB SMOKE: file loaded, artboards=["fixtures", "responsive", "textbed", "card", "cards"] @ http://127.0.0.1:8971/index.js:451
+[  681256ms] [LOG] Rive: Command Server Scripting Enabled. @ http://127.0.0.1:8971/index.js:451
+[  681623ms] [LOG] WEB SMOKE: rendering (3 distinct colors) @ http://127.0.0.1:8971/index.js:451
+[  681993ms] [LOG] WEB SMOKE OK: load + render + data binding on web @ http://127.0.0.1:8971/index.js:451
+[  707909ms] [WARNING] The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio @ http://127.0.0.1:8971/index.js:0
+[  808934ms] [WARNING] The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio @ http://127.0.0.1:8971/index.js:0
+[  862835ms] [WARNING] The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio @ http://127.0.0.1:8971/index.js:0

@@ -138,6 +138,6 @@ Also tracked from the official feature-support matrix: file-handle caching
 | 0 — skeleton + build proof | G6.1, G2.4 (headless logic), G7.1–G7.2 foundations |
 | 1 — desktop Vulkan render | G1.1–G1.4 (Vulkan), G4.1 partial |
 | 2 — pipeline + API | G3.*, G4.* complete on desktop |
-| 3 — platform breadth | G1.3 (Metal/D3D12/Android/GL), G2.1–G2.2 |
-| 4 — web + features | G2.3, G5.* |
-| 5 — hardening + release | G1.5, G6.2–G6.5, G7.3 budgets locked, success criteria audit |
+| 3 — platform breadth | G1.3 (Metal/D3D12/Android/GL), G2.1–G2.2 — GL bridge built; Android/Metal/D3D12 pending hardware |
+| 4 — web + features | G2.3 ✅ (WebGL2 browser-verified), G5.* ✅ (text/layout/audio/scripting all shipped & verified) |
+| 5 — hardening + release | G1.5 ✅ (adaptive one-flush-per-frame batching), G6.2–G6.5 (packaging/releases NEXT), G7.3 budgets tracked (bench.tscn), success criteria audit pending |

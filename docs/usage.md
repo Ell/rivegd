@@ -6,14 +6,15 @@ and [`ux-design.md`](ux-design.md).
 
 ## Current requirements & limitations
 
-- **Godot 4.7+, Forward+ or Mobile rendering method (Vulkan).**
-  macOS/iOS (Metal), D3D12, Android GLES3, and web are on the roadmap
-  (GOALS G1.3/G2). A GL/GLES backend is already built in, but **desktop
-  Compatibility cannot render**: Godot creates a GL 3.3 core context and
-  rive's desktop-GL minimum is 4.2 (GLES minimum is 3.0, so Android/web
+- **Godot 4.7+, Forward+ or Mobile rendering method (Vulkan) on desktop —
+  or a Web export (WebGL2)**, which works end to end (see
+  [Web exports](#web-exports)). macOS/iOS (Metal), D3D12, and Android
+  GLES3 are on the roadmap (GOALS G1.3/G2). **Desktop Compatibility cannot
+  render**: Godot creates a GL 3.3 core context and rive's desktop-GL
+  minimum is 4.2 (GLES minimum is 3.0, which is why Android and web
   qualify). Unsupported renderers degrade to logic-only: `.riv` files load
   and state machines advance, nothing draws.
-- Prebuilt binaries: Linux x86_64 only so far (CI artifacts). Other desktop
+- Prebuilt binaries: Linux x86_64 only so far (CI artifacts). Other
   platforms build from source (below).
 - **C# works** — same API via ClassDB (`obj.Call("set_property", ...)`,
   signals into `Callable.From`); verified headless in CI
@@ -28,7 +29,7 @@ and [`ux-design.md`](ux-design.md).
    `addons/rive/bin/<platform>/librivegd.<platform>.<target>.<arch>.so|dll`
    (CI artifacts follow this layout; `scons` puts them there automatically).
 3. Open the project — the extension registers `RiveFileResource`,
-   `RiveSprite2D`, and `RiveControl`.
+   `RiveSprite2D`, `RiveControl`, `RiveTexture`, and `RiveAudioStream`.
 
 ## Quick start
 

@@ -1,6 +1,40 @@
 # rivegd — Development & Testing Design
 
-Companion to [`GOALS.md`](../GOALS.md). The central problem: a GDExtension that drives a GPU renderer is, naively, only testable by clicking around in the editor. The architecture below is arranged so that **most code never needs Godot to be tested, and nothing needs a physical GPU** — CI runs everything on software rasterizers.
+Companion to [`GOALS.md`](../GOALS.md).
+
+> **Status (July 2026) — design vs reality.** This document is the original
+> test-architecture design; the shipped reality covers its intent with a
+> leaner shape:
+> - **Tier 0** ✅ as designed: Catch2 + NoOpFactory, 66 assertions
+>   (`tools/test.sh unit`), layering lint.
+> - **Tiers 1–2** (draw-stream, native goldens): not built; their job is
+>   covered by the pixel-asserting Godot smokes below.
+> - **Tier 3** ✅ as smoke *scenes* rather than gdUnit4: 17 scenes under
+>   `tests/project/` — `api_smoke` (13 phases: inputs, pointer, data
+>   binding, hot reload, texture, enum/trigger, lists incl. item reads,
+>   keyboard/focus, audio, gamepad, behavioral Luau, targeted callables,
+>   fit pixels), `ordering_smoke` (O1–O4 event-ordering guarantees — the
+>   merge bar), `render_smoke` (content-asserting), plus feature smokes:
+>   `cards` (dynamic lists), `scroll`, `reflow` (Yoga), `fallbackfont`
+>   (CJK/RTL), `clicklistener`, `translucent` (hit testing), `multitouch`,
+>   `multi` (instance independence), `resize` (state preservation),
+>   `semantics` (accessibility), `audiobus`, `texture3d` (raycast → UV →
+>   listener), `overlay`, `fit`, `oob` (referenced assets), `web_smoke`
+>   (runs in-browser). GPU smokes run on a real display (Xvfb+NVIDIA
+>   Vulkan hangs); logic smokes run headless.
+> - **Tier 4** partial: thumbnails exercised; headless `--import` crashes
+>   with any class-registering extension (upstream bug, `tests/upstream/`,
+>   CI works around with `|| true`).
+> - **Tier 5** ✅: `bench.tscn` (`RIVEGD_BENCH_COUNT/FIXTURE/ARTBOARD/
+>   SIZE`, `RIVEGD_BATCH_SIZE`); reference numbers in GOALS/README.
+> - **Tier 6 (web)** partial ✅: the export pipeline works and `web_smoke`
+>   verifies load + render + data binding in Chrome (driven manually via
+>   Playwright); the CI browser harness and lockstep gate are still to
+>   build. Emscripten pin: **4.0.20** (what Godot 4.7 templates actually
+>   use — not the version in Godot's CI workflow file).
+> - **CI**: GitHub Actions (build + unit + ordering + C# mono job) and a
+>   GitLab mirror — leaner than the matrix below, which remains the
+>   target state. The central problem: a GDExtension that drives a GPU renderer is, naively, only testable by clicking around in the editor. The architecture below is arranged so that **most code never needs Godot to be tested, and nothing needs a physical GPU** — CI runs everything on software rasterizers.
 
 ---
 

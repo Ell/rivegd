@@ -123,6 +123,39 @@
 				Writes a scalar property on the list item at [param index].
 			</description>
 		</method>
+		<method name="on_event">
+			<return type="Callable" />
+			<param index="0" name="name" type="String" />
+			<param index="1" name="callable" type="Callable" />
+			<description>
+				Calls [param callable]([code]properties: Dictionary[/code]) whenever the Rive event [param name] fires. Returns the connected wrapper — pass it to [code]disconnect("rive_event", wrapper)[/code] to unsubscribe.
+			</description>
+		</method>
+		<method name="on_property">
+			<return type="Callable" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="callable" type="Callable" />
+			<description>
+				Watches [param path] and calls [param callable]([code]value[/code]) on every change (the path is auto-watched). Returns the connected wrapper for [code]disconnect("property_changed", wrapper)[/code].
+			</description>
+		</method>
+		<method name="list_read_property">
+			<return type="void" />
+			<param index="0" name="path" type="String" />
+			<param index="1" name="index" type="int" />
+			<param index="2" name="sub_path" type="String" />
+			<description>
+				Asynchronously reads a list item's scalar: the value arrives via [signal property_changed] at the synthetic path [code]"path[index]/sub_path"[/code] and is cached for [method get_property].
+			</description>
+		</method>
+		<method name="send_pointer_uv">
+			<return type="void" />
+			<param index="0" name="phase" type="int" />
+			<param index="1" name="uv" type="Vector2" />
+			<description>
+				Pointer input in UV space (0–1 across the texture) — the 3D path: raycast your mesh, derive the hit UV, forward it here and Rive listeners fire. Phases: [code]0[/code] move, [code]1[/code] down, [code]2[/code] up, [code]3[/code] exit.
+			</description>
+		</method>
 	</methods>
 	<members>
 		<member name="file" type="RiveFileResource" setter="set_file" getter="get_file">
@@ -142,6 +175,15 @@
 		</member>
 		<member name="speed_scale" type="float" setter="set_speed_scale" getter="get_speed_scale" default="1.0">
 			Playback speed multiplier (also affected by [member Engine.time_scale]).
+		</member>
+		<member name="fit" type="int" setter="set_fit" getter="get_fit" default="0">
+			How the artboard maps to the texture: [code]0[/code] Contain (default), [code]1[/code] Cover, [code]2[/code] Fill, [code]3[/code] Fit Width, [code]4[/code] Fit Height, [code]5[/code] None, [code]6[/code] Scale Down, [code]7[/code] Layout. [b]Layout[/b] resizes the artboard itself so its Rive layout (Yoga) reflows to the node's size — use it for responsive UI. Pointer input and hit testing stay accurate in every mode.
+		</member>
+		<member name="alignment" type="int" setter="set_alignment" getter="get_alignment" default="4">
+			Anchor for fit modes that do not fill exactly, as a 9-grid index (0 = top-left … 4 = center … 8 = bottom-right).
+		</member>
+		<member name="layout_scale" type="float" setter="set_layout_scale" getter="get_layout_scale" default="1.0">
+			Content scale for [code]fit = Layout[/code]: the artboard is laid out at [code]size / layout_scale[/code] and drawn scaled up. Constant physical size: set to [code]DisplayServer.screen_get_dpi() / reference_dpi[/code].
 		</member>
 	</members>
 	<signals>

@@ -1,5 +1,14 @@
 # Rive ⇄ Godot Integration — Implementation Strategy
 
+> **Status (July 2026):** the strategy below was executed and held up.
+> Shipped: Vulkan zero-copy path, CommandQueue lifetime model (M0+M1;
+> M2/M3 intentionally dropped after auditing the listener surface — see
+> `commandqueue-migration.md`), one-flush-per-frame pump with adaptive
+> chunked submission, full API surface, and the web (WebGL2/wasm dlink)
+> port. The GL bridge's desktop-Compatibility limitation (Godot creates
+> GL 3.3 core; rive needs 4.2) was confirmed; its real targets are
+> Android GLES3 and WebGL2 — the latter now working.
+
 **Target:** Godot 4.7 stable (latest; godot-cpp master tracks `4.7.stable.official`) · **Foundation:** `rive-app/rive-runtime` (official C++ SDK, MIT) · **Packaging:** GDExtension
 
 This strategy was derived from primary sources only: the `rive-runtime` source tree (inspected locally), Godot 4.7's `extension_api.json` / godot-cpp, Godot engine docs/proposals, and Rive's official docs — deliberately *not* from prior Rive-Godot integration attempts. Rive's Unity/Unreal integrations were consulted only as SDK-usage precedent. Claims below marked **[verified]** survived 3-vote adversarial verification against live sources (2026-07-06); claims marked **[source]** were confirmed directly in the checked-out repos.
