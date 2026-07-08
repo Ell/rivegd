@@ -65,3 +65,68 @@ jobs:
           # Ordering guarantees (event/property delivery order; headless).
           ./Godot_v4.7-stable_linux.x86_64 --headless --path tests/project ordering_smoke.tscn 2>&1 | tee /tmp/ord.log
           grep -q "ORDERING OK" /tmp/ord.log
+
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          # google-chrome is preinstalled on GitHub runners (the apt
+          # chromium-browser package is a snap shim; avoid it).
+          sudo apt-get install -y --no-install-recommends clang ninja-build scons uuid-dev
+
+      - name: Cache rive stage-1 wasm build
+        uses: actions/cache@v4
+        with:
+          path: |
+            thirdparty/rive-runtime/renderer/out/wasm_release
+            thirdparty/rive-runtime/build/dependencies/emsdk_4.0.20
+          key: rive-wasm-${{ hashFiles('.gitmodules', 'tools/build_rive_web.sh') }}-${{ hashFiles('thirdparty/rive-runtime/.git') }}
+
+      - name: Build rive (stage 1, wasm)
+        run: tools/build_rive_web.sh release
+
+      - name: Build GDExtension (stage 2, wasm side module)
+        run: |
+          source thirdparty/rive-runtime/build/dependencies/emsdk_4.0.20/emsdk_env.sh
+          scons platform=web target=template_release threads=no -j$(nproc)
+
+      - name: Cache Godot web export templates
+        id: templates
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot/export_templates/4.7.stable
+          key: godot-web-templates-4.7-stable
+
+      - name: Install web export templates
+        if: steps.templates.outputs.cache-hit != 'true'
+        run: |
+          curl -sfL -o /tmp/templates.tpz https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_export_templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates/4.7.stable
+          cd /tmp && unzip -o -q templates.tpz "templates/web_dlink*" "templates/version.txt"
+          mv templates/web_dlink*.zip ~/.local/share/godot/export_templates/4.7.stable/
+
+      - name: Export web build
+        run: |
+          curl -sfLO https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q Godot_v4.7-stable_linux.x86_64.zip
+          ./Godot_v4.7-stable_linux.x86_64 --headless --path tests/project --import || true
+          mkdir -p out/web
+          ./Godot_v4.7-stable_linux.x86_64 --headless --path tests/project --export-release "Web" ../../out/web/index.html
+          test -f out/web/index.wasm && test -f out/web/librivegd.web.template_release.wasm32.nothreads.wasm
+
+      - name: ABI check (side-module imports vs engine exports)
+        run: |
+          source thirdparty/rive-runtime/build/dependencies/emsdk_4.0.20/emsdk_env.sh
+          node .github/scripts/check_wasm_abi.mjs
+
+      - name: In-browser smoke (headless chromium)
+        run: |
+          source thirdparty/rive-runtime/build/dependencies/emsdk_4.0.20/emsdk_env.sh
+          (cd out/web && python3 -m http.server 8971 &) && sleep 1
+          node .github/scripts/web_smoke.mjs
