@@ -127,6 +127,16 @@ static Variant read_vm_property(rive::ViewModelInstanceValueRuntime* value) {
                 static_cast<rive::ViewModelInstanceEnumRuntime*>(value)
                     ->value()
                     .c_str());
+        case rive::DataType::color: {
+            const int argb =
+                static_cast<rive::ViewModelInstanceColorRuntime*>(value)
+                    ->value();
+            const uint32_t c = uint32_t(argb);
+            return Color(float((c >> 16) & 0xFF) / 255.0f,
+                         float((c >> 8) & 0xFF) / 255.0f,
+                         float(c & 0xFF) / 255.0f,
+                         float((c >> 24) & 0xFF) / 255.0f);
+        }
         case rive::DataType::trigger:
             // Triggers carry no value; reported as fired.
             return true;
@@ -801,14 +811,6 @@ void RiveRenderServer::rt_render_instance(int64_t p_instance_id,
                                           Instance* instance) {
     bridge->begin_frame(instance->size.x, instance->size.y, 0x00000000);
 
-    static int dbg = 0;
-    if (dbg < 8) {
-        dbg++;
-        fprintf(stderr, "[draw] ab=%.0fx%.0f tex=%dx%d fit=%d ls=%.2f\n",
-                instance->artboard->width(), instance->artboard->height(),
-                instance->size.x, instance->size.y, instance->fit,
-                instance->layout_scale);
-    }
     rive::RiveRenderer renderer(bridge->render_context());
     renderer.save();
     const FitTransform fit = compute_fit(
@@ -1192,6 +1194,9 @@ void RiveRenderServer::rt_watch_vm_property(int64_t p_instance_id,
     }
     if (value == nullptr) {
         value = instance->view_model->propertyEnum(path);
+    }
+    if (value == nullptr) {
+        value = instance->view_model->propertyColor(path);
     }
     if (value == nullptr) {
         value = instance->view_model->propertyList(path);

@@ -42,7 +42,7 @@ Design rationale and evidence live in [`docs/implementation-strategy.md`](docs/i
   | number | `float` (set/get/watch/inspector) | ✅ |
   | boolean | `bool` (set/get/watch/inspector) | ✅ |
   | string | `String` (set/get/watch/inspector) | ✅ |
-  | color | `Color` (set/get/watch/inspector) | ✅ |
+  | color | `Color` (set/get/watch/inspector) | ✅ (watch/read landed with the click-listener fixture — was write-only until then) |
   | trigger | `fire_property_trigger()` + watchable (signal when fired) | ✅ |
   | enum | `String` value + inspector dropdown from the file's enum values | ✅ |
   | nested viewModel | slash paths (`"a/b/c"`) into nested properties; `replace_view_model` instance swapping | ✅ |

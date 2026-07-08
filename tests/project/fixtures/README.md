@@ -40,6 +40,13 @@ cards.riv also carries (all component artboards):
   remains; also proves RTL shaping and multi-fallback iteration).
 - The `cards` grid has overflow: scroll (clips); interactive drag-scroll
   needs an editor-authored ScrollConstraint (not MCP-exposed) — pending.
+- `card` carries a declarative Click listener (targets card-bg, sets
+  CardVM.tint to red) — clicklistener_smoke drives it through Godot input
+  and asserts the VM write via watch AND pixels. Authoring note: this
+  editor build only offers POINTER listener conditions (no Key Down) —
+  declarative key listeners are not authorable yet; keyboard-behavioral
+  verification remains upstream-blocked (rive's own keyboard fixture uses
+  a script for exactly this reason).
 
 Re-authoring: open in the Rive editor with the MCP server, or rebuild from
 the tool calls recorded in the project history. Signed export is a manual
