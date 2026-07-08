@@ -1,0 +1,3 @@
+[     756ms] TypeError: Cannot read properties of undefined (reading 'value')
+    at reportUndefinedSymbols (http://127.0.0.1:8971/index.js:1:71304)
+    at loadDylibs (http://127.0.0.1:8971/index.js:1:71671)

@@ -18,7 +18,7 @@ Design rationale and evidence live in [`docs/implementation-strategy.md`](docs/i
 
 - **G2.1** Tier 1: Windows, Linux, macOS (editor + export).
 - **G2.2** Tier 2: Android, iOS (static-link export path).
-- **G2.3** Tier 3: Web via dlink wasm export templates, single-threaded-safe, Emscripten version in lockstep with Godot's templates.
+- **G2.3** Tier 3: Web via dlink wasm export templates, single-threaded-safe, Emscripten version in lockstep with Godot's templates. ✅ WORKING: Rive Renderer on WebGL2 in-browser (Chrome-verified: load + render + data binding + Luau VM init; `tools/build_rive_web.sh` + `scons platform=web`). Gotchas conquered: `-sSUPPORT_LONGJMP=wasm` (Godot's module exports wasm-mode longjmp only), `--no-wasm-simd` (v128 signatures can't cross emscripten dylink JS trampolines), Emscripten 4.0.20 (matches the actual 4.7 templates — the CI file's 4.0.11 is stale).
 - **G2.4** Graceful degradation everywhere: headless/server builds load files and advance state machines without a GPU (logic-only), for tests and dedicated servers.
 
 ## G3. Asset pipeline & editor experience

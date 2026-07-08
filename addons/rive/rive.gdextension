@@ -12,3 +12,5 @@ windows.debug.x86_64 = "res://addons/rive/bin/windows/librivegd.windows.template
 windows.release.x86_64 = "res://addons/rive/bin/windows/librivegd.windows.template_release.x86_64.dll"
 macos.debug = "res://addons/rive/bin/macos/librivegd.macos.template_debug.framework"
 macos.release = "res://addons/rive/bin/macos/librivegd.macos.template_release.framework"
+web.debug.wasm32 = "res://addons/rive/bin/web/librivegd.web.template_debug.wasm32.nothreads.wasm"
+web.release.wasm32 = "res://addons/rive/bin/web/librivegd.web.template_release.wasm32.nothreads.wasm"

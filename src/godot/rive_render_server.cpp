@@ -2,7 +2,9 @@
 
 #include "render/gl/gl_bridge.hpp"
 #include "render/render_bridge.hpp"
+#ifdef RIVE_VULKAN
 #include "render/vulkan/vulkan_bridge.hpp"
+#endif
 
 #include "rive/artboard.hpp"
 #include "rive/command_queue.hpp"
@@ -438,6 +440,7 @@ bool RiveRenderServer::rt_ensure_bridge() {
         }
         return false;
     }
+#ifdef RIVE_VULKAN
     render::GodotVulkanHandles handles;
     handles.instance = rd->get_driver_resource(
         RenderingDevice::DRIVER_RESOURCE_TOPMOST_OBJECT, RID(), 0);
@@ -459,6 +462,12 @@ bool RiveRenderServer::rt_ensure_bridge() {
         return false;
     }
     return true;
+#else
+    // No Vulkan on this platform (web): an RD device is unexpected.
+    bridge_failed = true;
+    ERR_PRINT("rivegd: RenderingDevice present but Vulkan not compiled in");
+    return false;
+#endif
 }
 
 void RiveRenderServer::rt_init_instance(int64_t p_instance_id,

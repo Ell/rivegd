@@ -1,0 +1,3 @@
+- generic:
+  - generic [active] [ref=f1e2]: Your browser does not support the canvas tag.
+  - generic [ref=f1e5]: type incompatibility when transforming from/to JS

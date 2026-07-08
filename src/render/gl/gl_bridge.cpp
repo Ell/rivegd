@@ -4,12 +4,20 @@
 #include "rive/renderer/gl/render_target_gl.hpp"
 #include "rive/renderer/texture.hpp"
 
+#ifdef __EMSCRIPTEN__
+// WebGL2: GL entry points are provided by the main module (Godot's web
+// template links emscripten's GL library); rive's RIVE_WEBGL build calls
+// them directly — no loader.
+#include <GLES3/gl3.h>
+#else
 #include "glad_custom.h" // gladLoadCustomLoader (in rive_pls_renderer)
 
 #include <dlfcn.h>
+#endif
 
 namespace rivegd::render {
 
+#ifndef __EMSCRIPTEN__
 // GL proc resolution: try GLX then EGL, falling back to direct dlsym — this
 // covers Godot's X11, Wayland, and ANGLE paths on desktop Linux.
 static void* s_gl_lib = nullptr;
@@ -32,6 +40,7 @@ static GLADapiproc gl_loader(const char* name) {
                ? reinterpret_cast<GLADapiproc>(dlsym(s_gl_lib, name))
                : nullptr;
 }
+#endif
 
 std::unique_ptr<GLBridge> GLBridge::create(std::string* out_error) {
     auto fail = [&](const char* msg) {
@@ -41,6 +50,7 @@ std::unique_ptr<GLBridge> GLBridge::create(std::string* out_error) {
         return nullptr;
     };
 
+#ifndef __EMSCRIPTEN__
     if (s_gl_lib == nullptr) {
         s_gl_lib = dlopen("libGL.so.1", RTLD_NOW | RTLD_LOCAL);
         if (s_gl_lib != nullptr) {
@@ -59,6 +69,7 @@ std::unique_ptr<GLBridge> GLBridge::create(std::string* out_error) {
     if (!gladLoadCustomLoader(&gl_loader)) {
         return fail("gladLoadCustomLoader failed (no current GL context?)");
     }
+#endif
 
     std::unique_ptr<GLBridge> bridge(new GLBridge());
     bridge->m_context = rive::gpu::RenderContextGLImpl::MakeContext();
@@ -117,10 +128,14 @@ bool GLBridge::flush_target(rive::gpu::RenderTarget* target,
 }
 
 void GLBridge::wait_idle() {
+#ifdef __EMSCRIPTEN__
+    glFinish(); // linked directly against emscripten's GLES3
+#else
     if (auto finish =
             reinterpret_cast<void (*)()>(gl_loader("glFinish"))) {
         finish();
     }
+#endif
 }
 
 } // namespace rivegd::render

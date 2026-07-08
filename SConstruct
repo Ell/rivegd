@@ -13,8 +13,16 @@ env = SConscript("thirdparty/godot-cpp/SConstruct")
 
 env.Append(CPPPATH=["src", "thirdparty/rive-runtime/include"])
 
-# Stage-1 output. build_rive.sh puts release builds in out/release.
-rive_out = ARGUMENTS.get("rive_out", "thirdparty/rive-runtime/renderer/out/release")
+is_web = env["platform"] == "web"
+
+# Stage-1 output. build_rive.sh puts release builds in out/release and
+# wasm builds in out/wasm_release (tools/build_rive_web.sh).
+rive_out = ARGUMENTS.get(
+    "rive_out",
+    "thirdparty/rive-runtime/renderer/out/wasm_release"
+    if is_web
+    else "thirdparty/rive-runtime/renderer/out/release",
+)
 if not os.path.isdir(rive_out):
     print("ERROR: rive static libs not found at '%s'." % rive_out)
     print("Run tools/build_rive.sh first (see docs/development-and-testing.md).")
@@ -28,13 +36,12 @@ env.Append(
         "thirdparty/rive-runtime/renderer/glad",
     ]
 )
-# rive's vulkan headers are guarded by RIVE_VULKAN (set by its premake
-# --with_vulkan build); GL headers select the glad desktop loader via
-# RIVE_DESKTOP_GL. Both must match the stage-1 build.
+# Backend defines must match the stage-1 build: desktop pairs Vulkan with
+# the glad desktop-GL loader (RIVE_VULKAN + RIVE_DESKTOP_GL); web is
+# WebGL2 (RIVE_WEBGL — rive's premake sets it for system:emscripten).
 env.Append(
-    CPPDEFINES=[
-        "RIVE_VULKAN",
-        "RIVE_DESKTOP_GL",
+    CPPDEFINES=(["RIVE_WEBGL"] if is_web else ["RIVE_VULKAN", "RIVE_DESKTOP_GL"])
+    + [
         # External audio engine (must match stage 1's
         # --with_rive_audio=external).
         "WITH_RIVE_AUDIO",
@@ -61,6 +68,15 @@ rive_libs = " ".join(
 )
 env.Append(_LIBFLAGS=" -Wl,--start-group %s -Wl,--end-group" % rive_libs)
 
+if is_web:
+    # Self-contained longjmp (libpng error handling): wasm-EH-based, no JS
+    # runtime support needed — Godot's engine module doesn't export
+    # emscripten_longjmp, so the default mode fails at dlink load. Must
+    # match stage 1 (tools/build_rive_web.sh sets EMCC_CFLAGS) and be set
+    # BEFORE core_env clones this environment.
+    env.Append(CCFLAGS=["-sSUPPORT_LONGJMP=wasm"])
+    env.Append(LINKFLAGS=["-sSUPPORT_LONGJMP=wasm"])
+
 # core/ and render/ (and rive's NoOpFactory) derive from rive types, which
 # are built rtti-off; compile them the same way. godot/ keeps godot-cpp's
 # defaults — it never includes rive renderer headers directly.
@@ -72,10 +88,17 @@ if env["target"] in ["editor", "template_debug"]:
         "src/gen/doc_data.gen.cpp", source=Glob("doc_classes/*.xml")
     )
 
+# Web has no Vulkan; the Vulkan bridge only compiles for desktop.
+render_sources = [
+    f
+    for f in Glob("src/render/*/*.cpp")
+    if not (is_web and "vulkan" in str(f))
+]
+
 sources = (
     ([doc_data] if env["target"] in ["editor", "template_debug"] else [])
     + [core_env.SharedObject(f) for f in Glob("src/core/*.cpp")]
-    + [core_env.SharedObject(f) for f in Glob("src/render/*/*.cpp")]
+    + [core_env.SharedObject(f) for f in render_sources]
     + [core_env.SharedObject("thirdparty/rive-runtime/utils/no_op_factory.cpp")]
     + Glob("src/godot/*.cpp")
     + Glob("src/godot/editor/*.cpp")

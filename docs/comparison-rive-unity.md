@@ -42,7 +42,7 @@ runtime + Rive Renderer.
 
 | Feature | rive-unity | rivegd status |
 |---|---|---|
-| **Shipped platforms** | D3D11, Metal (macOS/iOS), OpenGL (Win/Android), Vulkan (Win/Android/Linux), WebGL | Linux Vulkan today; GL bridge written (Android/WebGL2 targets); Metal/D3D12/web pending hardware/phase 4. **Biggest gap.** |
+| Shipped platforms | D3D11, Metal (macOS/iOS), OpenGL (Win/Android), Vulkan (Win/Android/Linux), WebGL | Linux Vulkan + **WebGL2 (browser-verified)**; GL bridge also targets Android GLES3 (build pending); Metal/D3D12 pending hardware. |
 | Out-of-band assets (referenced images/fonts/audio) | ✅ shipped | ✅ shipped (sibling-file convention, queue global registry; smoke-verified) |
 | Listener-aware hit testing (`Translucent`) | ✅ per-widget Hit Test Behavior | ✅ `hit_test_behavior` on RiveControl (sync `hitTest` guarded by the flush mutex; smoke-verified) |
 | Multitouch | ✅ | ✅ per-finger pointer ids (touch index → rive pointerId; smoke-verified) |
