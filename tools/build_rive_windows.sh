@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stage-1 Windows cross-build (from Linux): rive static libs as x86_64
+# Stage-1 Windows cross-build (from Linux, posix-thread mingw model): rive static libs as x86_64
 # COFF via clang --target=x86_64-w64-mingw32 (+lld). Vulkan-only — Godot
 # on Windows runs Vulkan for Forward+/Mobile, so the D3D backends aren't
 # needed (and their shader step needs fxc, a Windows-only tool).

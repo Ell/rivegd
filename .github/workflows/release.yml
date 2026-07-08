@@ -70,6 +70,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends clang lld ninja-build scons uuid-dev glslang-tools g++-mingw-w64-x86-64
+          # Ubuntu's mingw defaults to the win32 thread model, which lacks
+          # std::call_once (undefined __once_callable at link). Select the
+          # posix-threaded flavor, matching the archives clang builds.
+          sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix
+          sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
       - name: Cache rive stage-1 windows build
         uses: actions/cache@v4
         with:
