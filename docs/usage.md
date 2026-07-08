@@ -264,7 +264,9 @@ $Grid.list_clear("items")                     # grid empties
 ```
 
 Verified end-to-end by `cards_smoke`; 200-500 static cards bench at ~6 ms
-(settled instances sleep — G4.6).
+(settled instances sleep — G4.6). Author a Scroll constraint on the list's
+layout and pointer drags scroll it (scroll_smoke) — move timestamps drive
+rive's scroll physics.
 
 ### Overlays over a game (HUDs, health bars, dialogue)
 
