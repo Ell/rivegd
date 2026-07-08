@@ -1,66 +1,75 @@
 # rivegd
 
-**Rive for Godot** — a GDExtension integrating [Rive](https://rive.app)'s official C++ runtime and GPU renderer (the Rive Renderer, running natively on Godot's graphics device) into Godot 4.7+. Runs on desktop Vulkan and **in the browser** (WebGL2).
+[Rive](https://rive.app) integration for Godot 4.7+, built on Rive's official
+C++ runtime and GPU renderer. Runs on the Vulkan renderers on desktop and on
+WebGL2 in web exports.
 
 ```gdscript
 var file: RiveFileResource = load("res://ui/menu.riv")   # no import step
 $RiveControl.file = file                                 # pointer listeners just work
 $RiveControl.set_bool_input("muted", true)               # state machine inputs
-$RiveControl.set_property("stats/health", 0.75)          # data binding (all VM types)
-$RiveControl.on_event("purchase", func(p): buy(p.sku))   # targeted callbacks
-$Grid.list_append("items", "CardVM")                     # dynamic lists reflow live
+$RiveControl.set_property("stats/health", 0.75)          # data binding
+$RiveControl.on_event("purchase", func(p): buy(p.sku))
+$Grid.list_append("items", "CardVM")                     # dynamic lists
 ```
 
-## What works today
+## Features
 
-| Area | Status |
-|---|---|
-| Rendering | Rive Renderer on Godot's Vulkan device (zero-copy RD textures) and WebGL2 (web export, browser-verified); one flush per frame, fence-ring-aware batched submissions |
-| Platforms | Linux (editor + export), **Web** (`platform=web` wasm side module, dlink) — macOS/Windows/mobile tracked in [`GOALS.md`](GOALS.md) |
-| Nodes | `RiveSprite2D`, `RiveControl`, `RiveTexture` (any texture slot, interactive on 3D meshes via `send_pointer_uv`) |
-| Fit & layout | full fit-mode set (contain/cover/fill/…/**layout** — real Yoga reflow), 9-anchor alignment, `layout_scale` (DPI recipes); live reflow during Control resize with **state-machine state preserved** across texture swaps |
-| Assets | `load("res://foo.riv")` directly; hot reload; out-of-band (referenced) assets auto-resolve by sibling-file convention; one shared import per resource; FileSystem thumbnails; inspector preview; drag-drop a `.riv` onto the 2D viewport to instantiate |
-| State machines | inputs as inspector properties, trigger fire-buttons, `state_changed`, event-ordering guarantees (O1–O4) pinned by a dedicated suite |
-| Events & callbacks | `rive_event(name, props)`, `loaded`, `property_changed` signals + targeted `on_event(name, cb)` / `on_property(path, cb)` |
-| Data binding | **every** VM type incl. per-item list read/write and color watch; dynamic lists drive rive-native layout (append → cards appear, verified) |
-| Input | pointer (multitouch, per-finger ids), listener-aware hit testing (`hit_test_behavior = Translucent`: clicks over empty regions fall through), keyboard + focus, text input, gamepad batching, interactive **scroll** (drag a rive Scroll-constrained list) |
-| Text | Rive's HarfBuzz/SheenBidi engine (RTL verified); **fallback fonts** (`RiveFileResource.add_fallback_font`) — a feature rive-unity doesn't expose |
-| Scripting | Luau VM compiled in; editor-signed scripts **run** (behaviorally verified in CI and in-browser) |
-| Audio | Rive audio through Godot's mixer; per-node bus routing (`audio_bus = "UI"`) |
-| Accessibility | `accessibility_enabled` mirrors rive's semantic tree into Godot's AccessKit — **first Rive game runtime with screen-reader support** |
-| C# | full API via ClassDB, verified headless in CI |
-| Perf | settled artboards sleep (500 static cards ≈ free); 500 *continuously-animating* 128px artboards at 13 ms avg / 14.6 ms p99 (RTX 4090); 50 heavy artboards ≈ 10.3 ms |
-| Editor | in-editor class reference (F1), configuration warnings, live preview, demo project |
-| Tests | 66-assertion unit suite + 14 pixel-asserting smoke scenes (api, ordering, render, cards, scroll, reflow, fallback-font, click-listener, translucent, multitouch, multi-instance, resize, semantics, audio-bus, 3D, overlay, web) |
+- Rendering through the Rive Renderer on Godot's own graphics device —
+  no CPU rasterization, no texture copies. Vector feathering and the rest
+  of Rive's renderer-only features work.
+- `RiveSprite2D`, `RiveControl` (forwards mouse/touch/keyboard/gamepad into
+  the artboard), and `RiveTexture` for use in any material or texture slot,
+  including interactive Rive on 3D meshes.
+- Load `.riv` files directly with `load()`; hot reload on re-export;
+  referenced (out-of-band) assets resolve from sibling files; editor
+  thumbnails, inspector preview, and drag-and-drop instantiation.
+- State machine inputs and view-model properties are real Godot properties:
+  inspector-editable, animatable, tweenable. Signals for events, state
+  changes, and property changes, plus `on_event`/`on_property` helpers.
+- Data binding for every view-model type Rive can author, including lists
+  (with per-item access) that drive Rive layout at runtime, nested view
+  models, and artboard/image properties.
+- Fit modes including `Layout`, which resizes the artboard so Rive layouts
+  reflow with the Control; resizing preserves state machine state.
+- Multitouch, drag scrolling of Rive scroll containers, and an optional
+  listener-aware hit-test mode where clicks over empty regions fall
+  through to the controls behind.
+- Rive text (including RTL), with an API for registering fallback fonts.
+- Luau scripting support (scripts authored in the Rive editor run as-is).
+- Rive audio through Godot's mixer, with optional per-node bus routing.
+- Optional accessibility support: Rive's semantic tree is mirrored into
+  Godot's accessibility system for screen readers.
+- Full API available from C#.
+- Web export support (`platform=web` GDExtension side module; works with
+  Godot's dlink templates).
 
-**Not yet:** macOS/iOS (Metal), Windows (D3D12), Android (GLES3 — the GL bridge targets it; build pending); desktop Compatibility cannot render (Godot creates GL 3.3, rive's desktop floor is 4.2 — [details](docs/usage.md)); declarative keyboard listeners (blocked upstream — the Rive editor only authors pointer listeners today).
+Not supported yet: macOS/iOS (Metal), Windows D3D12, Android. The desktop
+Compatibility renderer can't render Rive content (Godot creates a GL 3.3
+context; the renderer needs GL 4.2 on desktop) — files still load and state
+machines still run, useful for servers and tests.
 
-## Try it
+## Building
 
 ```sh
 git clone --recurse-submodules https://github.com/Ell/rivegd
 cd rivegd
-tools/build_rive.sh                          # stage 1 (clang, ninja, uuid-dev, glslang-tools, libvulkan-dev)
+tools/build_rive.sh                # stage 1: rive static libs
+                                   # (clang, ninja, uuid-dev, glslang-tools, libvulkan-dev)
 python3 -m venv .venv && .venv/bin/pip install scons
-.venv/bin/scons                              # stage 2
-godot --path demo                            # showcase scene (overlays.tscn: health bars + dialogue)
+.venv/bin/scons                    # stage 2: the extension → addons/rive/bin/
+godot --path demo                  # example scenes
 ```
 
-Web export: `tools/build_rive_web.sh`, then `scons platform=web target=template_release threads=no` (see [`docs/usage.md`](docs/usage.md#web-exports) — three non-obvious Emscripten flags are baked in).
+For web exports, see [`docs/usage.md`](docs/usage.md#web-exports).
 
 ## Documentation
 
-- [`docs/usage.md`](docs/usage.md) — **how to use the extension** (nodes, data binding, overlays, dynamic lists, 3D, web, accessibility, fallback fonts)
-- [`demo/`](demo/) — runnable examples (API showcase + game-overlay patterns)
-- [`GOALS.md`](GOALS.md) — goals, status, roadmap, success criteria
-- [`docs/comparison-rive-unity.md`](docs/comparison-rive-unity.md) — feature-by-feature vs Rive's first-party Unity runtime (we exceed it in four areas)
-- [`docs/implementation-strategy.md`](docs/implementation-strategy.md) — architecture & research evidence
-- [`docs/development-and-testing.md`](docs/development-and-testing.md) — repo layout, test tiers, CI
-- [`CLAUDE.md`](CLAUDE.md) — build/test commands and hard-won gotchas for contributors (human or AI)
-
-## How it compares
-
-Measured against **rive-unity** (Rive's own first-party runtime): parity or better on every feature row of Rive's official support matrix — and rivegd additionally ships fallback fonts, accessibility, keyboard/text/gamepad input, and behavioral script verification, which rive-unity doesn't ([full comparison](docs/comparison-rive-unity.md)). Prior Godot attempts split into CPU-raster (Skia + pixel copies — an approach Rive itself moved away from) and GPU-native; rivegd differentiates on frame-sync rigor, breadth of *verified* behavior, and editor UX. If you need macOS/D3D12 today, [RiveGD](https://github.com/maidopi-usagi/RiveGD)'s backend breadth is still ahead there.
+- [`docs/usage.md`](docs/usage.md) — full usage guide: nodes, data binding,
+  overlays, dynamic lists, 3D, web, audio, accessibility.
+- [`demo/`](demo/) — runnable examples.
+- In-editor class reference (F1 on any Rive class).
+- [`CLAUDE.md`](CLAUDE.md) — build details and pitfalls for contributors.
 
 ## License
 

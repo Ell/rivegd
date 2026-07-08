@@ -1,7 +1,9 @@
 # rivegd — contributor notes (humans and AI agents)
 
-Rive's C++ runtime + Rive Renderer as a Godot 4.7 GDExtension. Read
-`GOALS.md` for what/why; this file is the how.
+Rive's C++ runtime + Rive Renderer as a Godot 4.7 GDExtension. This file
+covers how to build, test, and avoid the traps. (Internal planning notes —
+`GOALS.md` and most of `docs/` — are kept local and gitignored; only
+`docs/usage.md` is published.)
 
 ## Build
 
@@ -101,7 +103,6 @@ FIFO makes it safe). One refcounted file import per `RiveFileResource`.
 
 ## Docs to keep in sync when shipping features
 
-`README.md` (feature table), `GOALS.md` (status markers), `docs/usage.md`
-(user-facing how-to), `docs/comparison-rive-unity.md` (if it moves a row),
-`doc_classes/*.xml` (in-editor F1 docs for any new API), and the memory
-file for lessons.
+`README.md` (feature list), `docs/usage.md` (user-facing how-to), and
+`doc_classes/*.xml` (in-editor F1 docs for any new API). Local-only:
+`GOALS.md` and the design notes under `docs/` (gitignored).

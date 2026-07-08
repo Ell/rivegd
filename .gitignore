@@ -19,6 +19,15 @@ __pycache__/
 # tool/session artifacts
 .playwright-mcp/
 
+# internal planning/design notes (kept local)
+GOALS.md
+docs/implementation-strategy.md
+docs/ux-design.md
+docs/development-and-testing.md
+docs/commandqueue-migration.md
+docs/comparison-rive-unity.md
+docs/upstream-issue-draft.md
+
 # godot project caches
 .godot/
 *.import

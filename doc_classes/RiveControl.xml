@@ -229,7 +229,7 @@
 			[code]0[/code] Opaque (default): the whole rect captures pointer events. [code]1[/code] Translucent: only points over an interactive Rive listener capture — clicks over empty or decorative regions fall through to controls behind (listener-aware, not alpha-based: invisible hit areas still capture).
 		</member>
 		<member name="accessibility_enabled" type="bool" setter="set_accessibility_enabled" getter="get_accessibility_enabled" default="false">
-			Mirrors the artboard's authored semantic tree (roles, labels, bounds) into Godot's accessibility system (AccessKit) as sub-elements of this control, making Rive UI visible to screen readers. Elements publish while assistive technology is active.
+			Mirrors the artboard's authored semantic tree (roles, labels, bounds) into Godot's accessibility system (AccessKit) as sub-elements of this control, making Rive UI visible to screen readers. Elements are published while assistive technology is active.
 		</member>
 	</members>
 	<signals>

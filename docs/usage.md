@@ -1,15 +1,12 @@
 # Using rivegd
 
-Rive playback for Godot **4.7+** as a GDExtension. This guide covers today's
-API (Phase 2b). For where the project is heading, see [`GOALS.md`](../GOALS.md)
-and [`ux-design.md`](ux-design.md).
+Rive playback for Godot 4.7+ as a GDExtension.
 
 ## Current requirements & limitations
 
-- **Godot 4.7+, Forward+ or Mobile rendering method (Vulkan) on desktop —
-  or a Web export (WebGL2)**, which works end to end (see
-  [Web exports](#web-exports)). macOS/iOS (Metal), D3D12, and Android
-  GLES3 are on the roadmap (GOALS G1.3/G2). **Desktop Compatibility cannot
+- Godot 4.7+ with the Forward+ or Mobile rendering method (Vulkan) on
+  desktop, or a Web export (WebGL2) — see [Web exports](#web-exports). macOS/iOS (Metal), D3D12, and Android
+  GLES3 are on the roadmap **Desktop Compatibility cannot
   render**: Godot creates a GL 3.3 core context and rive's desktop-GL
   minimum is 4.2 (GLES minimum is 3.0, which is why Android and web
   qualify). Unsupported renderers degrade to logic-only: `.riv` files load
@@ -17,10 +14,10 @@ and [`ux-design.md`](ux-design.md).
 - Prebuilt binaries: Linux x86_64 only so far (CI artifacts). Other
   platforms build from source (below).
 - **C# works** — same API via ClassDB (`obj.Call("set_property", ...)`,
-  signals into `Callable.From`); verified headless in CI
-  (`tests/csharp/CsSmoke.cs` is the example).
+  signals into `Callable.From`); exercised in CI
+  (see `tests/csharp/CsSmoke.cs` for an example).
 - Data binding: typed writes, watch-based reads, and per-path change
-  signals (GOALS G4.4).
+  signals.
 
 ## Install
 
@@ -153,11 +150,11 @@ $Menu.state_changed.connect(func(state_name: String):
 
 Script-bearing files (scripted drawables, path effects, interpolators, data
 converters authored in the Rive editor) just work — the runtime instances a
-sandboxed Luau VM per file. Scripts are **signature-verified against Rive's
+sandboxed Luau VM per file. Scripts are signature-verified against Rive's
 production key**: editor-exported files run their scripts; unsigned or
 sample-signed bytecode is rejected gracefully (the file still loads and
 plays its non-scripted content). There is no Godot→Luau channel by design —
-data binding and events are the handoff (see GOALS N3).
+data binding and events are the handoff.
 
 ### Audio
 
@@ -190,7 +187,7 @@ $Menu.send_text_input("hello")  # programmatic text entry
 ```
 
 Bridging Rive's focus edge into Godot's own focus chain (yielding to the
-next Control) is on the roadmap (GOALS G4.7).
+next Control) is planned.
 
 ### Hot reload
 
@@ -220,8 +217,7 @@ Rive lets designers annotate artboards with semantics (roles, labels).
 `RiveControl.accessibility_enabled = true` mirrors that semantic tree into
 Godot's accessibility system (AccessKit) as live sub-elements — buttons,
 text, sliders inside your Rive UI become visible to screen readers, with
-bounds tracking the node's fit transform. No other game-engine Rive
-runtime exposes this today. (Elements publish when assistive technology is
+bounds tracking the node's fit transform. (Elements publish when assistive technology is
 active; the semantic stream itself is inspectable via
 `get_semantics_node_count()`.)
 
@@ -229,7 +225,7 @@ active; the semantic stream itself is inspectable via
 
 When a Rive text run needs a glyph its authored font lacks (CJK,
 localization, symbols), registered fallbacks are consulted in order —
-global, one line (rive-unity doesn't expose this yet):
+global, one line:
 
 ```gdscript
 RiveFileResource.add_fallback_font(load("res://fonts/NotoSansJP.ttf"))
@@ -264,14 +260,12 @@ $Grid.list_set_property("items", 1, "value", 0.25)  # only card 1 changes
 $Grid.list_clear("items")                     # grid empties
 ```
 
-Verified end-to-end by `cards_smoke`; 200-500 static cards bench at ~6 ms
-(settled instances sleep — G4.6). Author a Scroll constraint on the list's
-layout and pointer drags scroll it (scroll_smoke) — move timestamps drive
-rive's scroll physics.
+See `tests/project/cards_smoke.gd` for a full example. Author a Scroll constraint on the list's
+layout and pointer drags scroll it.
 
 ### Overlays over a game (HUDs, health bars, dialogue)
 
-Rive shines as UI *over* gameplay. The patterns:
+Common patterns for Rive as UI over gameplay:
 
 - **World-anchored (health bar over an enemy):** make a `RiveSprite2D` a
   **child** of the entity node — it follows automatically, captures no
@@ -288,7 +282,7 @@ Rive shines as UI *over* gameplay. The patterns:
 
 - **Screen HUD / dialogue box:** a `RiveControl` with
   `mouse_filter = MOUSE_FILTER_IGNORE` — it animates and data-binds but lets
-  gameplay clicks fall **through** to the game (verified). Use the default
+  gameplay clicks fall **through** to the game. Use the default
   `STOP` instead for a modal box that has its own buttons.
 - **In 3D:** put a `RiveTexture` on a billboarded quad's material for a
   world-space bar, or a `RiveControl` in a `CanvasLayer` positioned each
@@ -309,11 +303,9 @@ accurate in every mode.
 Resizing a `RiveControl` is cheap and stateful: with `fit = Layout` the
 artboard reflows **live** while the size changes, and once the size
 settles (0.3 s) only the GPU texture is swapped — the state machine, view
-model, and playback position all survive (verified: a toggled switch stays
-toggled through a resize).
+model, and playback position all survive the resize.
 
-With `fit = Layout`, `layout_scale` sets the content scale (Unity's
-"Layout Scale Factor"): the artboard is laid out at `size / layout_scale`
+With `fit = Layout`, `layout_scale` sets the content scale: the artboard is laid out at `size / layout_scale`
 and drawn scaled up. DPI recipes: constant pixel size = leave at 1.0;
 constant physical size = `DisplayServer.screen_get_dpi() / 160.0` (or your
 reference DPI), updated on window/screen change.
@@ -322,7 +314,7 @@ reference DPI), updated on window/screen change.
 
 Instance creation is asynchronous (queued to the render thread).
 `RiveSprite2D`/`RiveControl` emit `loaded` when the instance is live —
-the equivalent of rive-unity's `WidgetStatus.Loaded`:
+so scripts know when reads and input are meaningful:
 
 ```gdscript
 rive_node.loaded.connect(func(): rive_node.set_property("health", 50.0))

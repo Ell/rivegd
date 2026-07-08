@@ -11,9 +11,8 @@ A single artboard `fixtures`, bound to view model `VisVM`:
 - `label` (string), `pulse` (trigger).
 - A `ProbeNode` Luau **scripted drawable**: on init writes `label="script-init"`;
   on any `box-scale` change writes `label="scaled:<box-scale>"`. Because the
-  file is exported from the Rive editor it is **production-signed**, so its
-  script actually executes in our production-key build — this is our only
-  behavioral Luau coverage (G5.4). See the api_smoke "Luau" phase.
+  file is exported from the Rive editor it is production-signed, so its
+  script actually executes in our production-key build. See the api_smoke "Luau" phase.
 - State machines `Chain` and `State Machine 1` (incidental; not asserted).
 
 ## cards.riv — dynamic-list test bed (authored via the Rive editor MCP)
