@@ -26,8 +26,16 @@ trap 'rm -rf "$SHIM_DIR"; git checkout -q -- premake5_pls_renderer.lua' EXIT
 # here would resolve to the shim itself and re-exec forever.
 CLANG_BIN="$(command -v clang)"
 CLANGXX_BIN="$(command -v clang++)"
-printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 -fuse-ld=lld "$@"\n' "$CLANG_BIN" > "$SHIM_DIR/clang"
-printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 -fuse-ld=lld "$@"\n' "$CLANGXX_BIN" > "$SHIM_DIR/clang++"
+# Distros shipping both mingw thread models (Ubuntu) need clang pinned to
+# the posix GCC install, or its libstdc++ headers inline win32-model
+# gthread calls (__gthr_win32_*) the posix runtime can't satisfy at link.
+GCC_POSIX_DIR="$(ls -d /usr/lib/gcc/x86_64-w64-mingw32/*-posix 2>/dev/null | sort -V | tail -1 || true)"
+GCC_DIR_FLAG=""
+if [ -n "$GCC_POSIX_DIR" ]; then
+    GCC_DIR_FLAG="--gcc-install-dir=$GCC_POSIX_DIR"
+fi
+printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 %s -fuse-ld=lld "$@"\n' "$CLANG_BIN" "$GCC_DIR_FLAG" > "$SHIM_DIR/clang"
+printf '#!/bin/sh\nexec %s --target=x86_64-w64-mingw32 %s -fuse-ld=lld "$@"\n' "$CLANGXX_BIN" "$GCC_DIR_FLAG" > "$SHIM_DIR/clang++"
 cat > "$SHIM_DIR/fxc" <<'EOF'
 #!/usr/bin/env bash
 out=""; prev=""
