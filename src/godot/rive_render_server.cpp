@@ -16,6 +16,7 @@
 #include "rive/animation/linear_animation.hpp"
 #include "rive/animation/state_machine_input_instance.hpp"
 #include "rive/animation/state_machine_instance.hpp"
+#include "rive/constraints/scrolling/scroll_constraint.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_boolean_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_color_runtime.hpp"
 #include "rive/viewmodel/runtime/viewmodel_instance_enum_runtime.hpp"
@@ -551,6 +552,16 @@ void RiveRenderServer::rt_init_instance(int64_t p_instance_id,
         }
     }
 
+    if (OS::get_singleton()->get_environment("RIVEGD_SCROLL_DEBUG") == "1") {
+        auto constraints =
+            instance->artboard->artboard()->find<rive::ScrollConstraint>();
+        for (auto* sc : constraints) {
+            UtilityFunctions::print(vformat(
+                "rivegd[scroll]: content=%.1fx%.1f viewport=%.1fx%.1f maxY=%.1f",
+                sc->contentWidth(), sc->contentHeight(), sc->viewportWidth(),
+                sc->viewportHeight(), sc->maxOffsetY()));
+        }
+    }
     // Create the shared texture and hand its native handle(s) to Rive.
     if (!rt_create_target(p_instance_id, instance, has_bridge)) {
         memdelete(instance);
@@ -1010,6 +1021,23 @@ void RiveRenderServer::rt_pointer(int64_t p_instance_id, int p_phase,
                                   const Vector2& p_local,
                                   const Vector2& p_node_size,
                                   int p_pointer_id, float p_timestamp) {
+    if (p_phase == POINTER_DOWN &&
+        OS::get_singleton()->get_environment("RIVEGD_SCROLL_DEBUG") == "1") {
+        Instance** dbg_found = instances.getptr(p_instance_id);
+        if (dbg_found != nullptr) {
+            auto constraints = (*dbg_found)
+                                   ->artboard->artboard()
+                                   ->find<rive::ScrollConstraint>();
+            for (auto* sc : constraints) {
+                UtilityFunctions::print(vformat(
+                    "rivegd[scroll@down]: content=%.1fx%.1f viewport=%.1fx%.1f maxY=%.1f",
+                    sc->contentWidth(), sc->contentHeight(),
+                    sc->viewportWidth(), sc->viewportHeight(),
+                    sc->maxOffsetY()));
+            }
+        }
+    }
+
     Instance** found = instances.getptr(p_instance_id);
     if (found == nullptr || (*found)->state_machine == nullptr) {
         return;
