@@ -18,6 +18,7 @@ var terminal_center := Vector3(0, 1.55, -5.82)
 var lamp_on := true
 var blocks := 0
 var info: Label
+var last_click_ms := 0
 
 
 func _ready() -> void:
@@ -97,7 +98,10 @@ func _ready() -> void:
 		room_light.light_color = Color(1.0, 0.95, 0.8) if lamp_on \
 				else Color(0.4, 0.45, 0.7))
 
-	_box(Vector3(-3, 0.4, -3), Vector3(1, 0.8, 1), wall_mat) # pedestal
+	var pedestal_mat := StandardMaterial3D.new()
+	pedestal_mat.albedo_color = Color(0.34, 0.37, 0.45)
+	pedestal_mat.roughness = 0.85
+	_box(Vector3(-3, 0.4, -3), Vector3(1, 0.8, 1), pedestal_mat)
 
 	var cross := GameUI.label("+", 22, Vector2.ZERO, Color(1, 1, 1, 0.8))
 	cross.set_anchors_preset(Control.PRESET_CENTER)
@@ -168,7 +172,7 @@ func _buy(index: int) -> void:
 	blocks += 1
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = _panel_texture(Color(0.85, 0.5, 0.15), Color(0.6, 0.32, 0.08))
-	_box(Vector3(-3, 1.0 + blocks * 0.45, -3), Vector3(0.4, 0.4, 0.4), mat)
+	_box(Vector3(-3, 1.0 + (blocks - 1) * 0.4, -3), Vector3(0.4, 0.4, 0.4), mat)
 	shop_items[index].set_property("sold", 0.3)
 	shop_items[index].set_property("price", "SOLD")
 
@@ -211,6 +215,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 			return
+		# Web pointer lock can re-dispatch the same click; duplicate
+		# toggles cancel each other out, so collapse them.
+		var now := Time.get_ticks_msec()
+		if now - last_click_ms < 200:
+			return
+		last_click_ms = now
 		_interact(1)
 		_interact(2)
 	elif event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
