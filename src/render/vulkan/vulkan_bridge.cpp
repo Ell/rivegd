@@ -286,6 +286,7 @@ bool VulkanBridge::begin_batch(std::string* out_error) {
 }
 
 bool VulkanBridge::flush_target(rive::gpu::RenderTarget* target_base,
+                                uint64_t /*native_texture*/,
                                 std::string* out_error) {
     // Targets handed to this bridge were created by wrap_render_target.
     auto* target =

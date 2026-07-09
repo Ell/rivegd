@@ -83,6 +83,7 @@ struct RiveRenderServer::Instance {
     rive::rcp<rive::ViewModelInstanceRuntime> view_model;
     rive::rcp<rive::gpu::RenderTarget> target;
     RID rd_texture; // RD-path only
+    uint64_t native_texture = 0; // GL-path: raw GLuint for post-flush fixups
     RID rs_texture; // RS-level texture, valid on every backend
     Vector2i size;
     int fit = 0;              // RiveRenderServer::FitMode
@@ -647,6 +648,7 @@ bool RiveRenderServer::rt_create_target(int64_t p_instance_id,
         native_a = rs->texture_get_native_handle(instance->rs_texture);
     }
     if (has_bridge) {
+        instance->native_texture = native_a;
         instance->target = bridge->wrap_render_target(
             instance->size.x, instance->size.y, native_a, native_b);
     }
@@ -863,7 +865,8 @@ void RiveRenderServer::rt_render_instance(int64_t p_instance_id,
     renderer.restore();
 
     std::string error;
-    if (!bridge->flush_target(instance->target.get(), &error)) {
+    if (!bridge->flush_target(instance->target.get(),
+                              instance->native_texture, &error)) {
         ERR_PRINT(String("rivegd: flush failed: ") + String::utf8(error.c_str()));
         instance->valid = false;
     }
@@ -1972,7 +1975,7 @@ void RiveRenderServer::rt_render_thumbnail(const PackedByteArray& p_data,
                 rive::Mat2D(fit.scale, 0, 0, fit.scale, fit.tx, fit.ty));
             artboard->draw(&renderer);
             renderer.restore();
-            bridge->flush_target(target.get(), &error);
+            bridge->flush_target(target.get(), native_a, &error);
             bridge->end_batch(&error);
             bridge->wait_idle();
             result = rs->texture_2d_get(rs_texture);

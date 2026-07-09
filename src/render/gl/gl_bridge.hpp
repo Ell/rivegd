@@ -36,6 +36,7 @@ public:
     void begin_frame(uint32_t width, uint32_t height,
                      uint32_t clear_color_argb) override;
     bool flush_target(rive::gpu::RenderTarget* target,
+                      uint64_t native_texture,
                       std::string* out_error) override;
     bool end_batch(std::string* out_error) override;
     void wait_idle() override;

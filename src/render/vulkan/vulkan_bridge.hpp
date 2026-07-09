@@ -71,6 +71,7 @@ public:
     // Records the accumulated draws for one target and transitions it to
     // SHADER_READ_ONLY_OPTIMAL (so Godot can sample it).
     bool flush_target(rive::gpu::RenderTarget* target,
+                      uint64_t native_texture,
                       std::string* out_error) override;
     bool end_batch(std::string* out_error) override;
 

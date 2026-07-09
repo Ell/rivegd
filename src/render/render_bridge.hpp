@@ -57,6 +57,7 @@ public:
                              uint32_t height,
                              uint32_t clear_color_argb) = 0;
     virtual bool flush_target(rive::gpu::RenderTarget* target,
+                              uint64_t native_texture,
                               std::string* out_error) = 0;
     virtual bool end_batch(std::string* out_error) = 0;
 

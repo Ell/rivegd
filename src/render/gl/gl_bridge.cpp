@@ -133,6 +133,7 @@ bool GLBridge::begin_batch(std::string*) { return true; }
 bool GLBridge::end_batch(std::string*) { return true; }
 
 bool GLBridge::flush_target(rive::gpu::RenderTarget* target,
+                            uint64_t native_texture,
                             std::string* out_error) {
     rive::gpu::RenderContext::FlushResources resources{};
     resources.renderTarget = target;
@@ -142,6 +143,20 @@ bool GLBridge::flush_target(rive::gpu::RenderTarget* target,
     // Rive bound internally (mirrors rive's own GL interop example).
     m_context->static_impl_cast<rive::gpu::RenderContextGLImpl>()
         ->unbindGLInternalResources();
+
+    if (native_texture != 0) {
+        // Completeness insurance for every consumer of this texture: it has
+        // no mip chain, and WebGL2 samples mip-incomplete textures as opaque
+        // black. Godot's 2D canvas rebinds with explicit filters each draw,
+        // but samplers reached through other paths (the 3D scene pass) can
+        // hit GL's mipmapped MIN_FILTER default.
+        glBindTexture(GL_TEXTURE_2D, GLuint(native_texture));
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
     return true;
 }
 
